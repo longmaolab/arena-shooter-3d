@@ -17,7 +17,8 @@ const MAX_HEALTH       := 100
 const MAX_AMMO         := 30
 const RELOAD_TIME      := 1.4
 const FIRE_RATE        := 0.12
-const BULLET_DAMAGE    := 25
+# Bullet damage lives on the server (game.gd::SERVER_BULLET_DAMAGE) — clients
+# don't get to choose how hard they hit.
 const SYNC_INTERVAL    := 0.05
 const RESPAWN_INVINCIBILITY := 1.5
 
@@ -242,7 +243,8 @@ func _try_shoot() -> void:
 		if victim and victim != self:
 			hit_player = true
 			var victim_peer_id: int = victim.get_multiplayer_authority()
-			_game.server_report_hit.rpc_id(NetworkManager.HOST_PEER_ID, victim_peer_id, BULLET_DAMAGE)
+			# Server applies the actual damage from its own constant; we just report the hit.
+			_game.server_report_hit.rpc_id(NetworkManager.HOST_PEER_ID, victim_peer_id)
 	else:
 		end_pos = camera.global_position + (-camera.global_transform.basis.z) * 80.0
 	_fire_fx.rpc(start_pos, end_pos, hit_player)
@@ -329,17 +331,26 @@ func _reload() -> void:
 # ─── Damage / Death / Respawn ────────────────────────────────────────
 
 @rpc("any_peer", "reliable", "call_local")
-func take_damage_remote(amount: int, attacker_peer_id: int) -> void:
-	if not is_multiplayer_authority() or health <= 0 or is_invincible:
+func take_damage_remote(new_health: int, amount: int, attacker_peer_id: int) -> void:
+	# Display-only: server has already applied the damage and will trigger the
+	# death sequence itself. We only accept this RPC when it originates from
+	# the server (sender == HOST_PEER_ID for remote, sender == 0 for the host's
+	# own call_local invocation).
+	var sender: int = multiplayer.get_remote_sender_id()
+	if sender == 0:
+		if not NetworkManager.is_server():
+			return
+	elif sender != NetworkManager.HOST_PEER_ID:
 		return
-	health -= amount
+	if not is_multiplayer_authority():
+		return
+	health = new_health
 	local_health_changed.emit(health)
 	local_damage_taken.emit(amount)
 	_play_hit_sfx.rpc()
 	if health <= 0:
 		_show_death.rpc()
 		local_died.emit()
-		_game.server_report_death.rpc_id(NetworkManager.HOST_PEER_ID, attacker_peer_id)
 
 @rpc("any_peer", "unreliable", "call_local")
 func _play_hit_sfx() -> void:

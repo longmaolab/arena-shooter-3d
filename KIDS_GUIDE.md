@@ -94,8 +94,9 @@ pkill -f "Godot.*--server" && pkill -x cloudflared
 | 跑步速度 | `scripts/player.gd` | `const SPEED := 6.0` |
 | 冲刺速度 | `scripts/player.gd` | `const SPRINT_SPEED := 10.0` |
 | 跳跃高度 | `scripts/player.gd` | `const JUMP_VELOCITY := 7.0` |
-| 满血量 | `scripts/player.gd` | `const MAX_HEALTH := 100` |
-| 子弹伤害 | `scripts/player.gd` | `const BULLET_DAMAGE := 25` |
+| 满血量（服务器权威） | `scripts/game.gd` | `const SERVER_MAX_HEALTH := 100` |
+| 子弹伤害（服务器权威） | `scripts/game.gd` | `const SERVER_BULLET_DAMAGE := 25` |
+| 复活无敌时长 | `scripts/game.gd` | `const SERVER_RESPAWN_INVINCIBILITY := 1.5` |
 | 满弹夹 | `scripts/player.gd` | `const MAX_AMMO := 30` |
 | 换弹时间 | `scripts/player.gd` | `const RELOAD_TIME := 1.4` |
 | 多少杀算赢 | `scripts/game.gd` | `const KILLS_TO_WIN := 10` |

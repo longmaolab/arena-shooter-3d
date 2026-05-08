@@ -40,7 +40,12 @@ func _ready() -> void:
 	if OS.has_feature("web"):
 		host_btn.disabled = true
 		host_btn.text = "Host (desktop only)"
-		status.text = "Press Join to connect"
+		# Block Join until server.json finishes loading; otherwise a fast tap
+		# would dial the localhost default that's only valid in dev.
+		join_btn.disabled = true
+		ip_input.text = ""
+		ip_input.placeholder_text = "Loading server URL..."
+		status.text = "Loading server URL..."
 		_load_default_server_url()
 	else:
 		status.text = "Pick Host or Join"
@@ -104,18 +109,26 @@ func _load_default_server_url() -> void:
 func _on_server_json_loaded(_result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray, http: HTTPRequest) -> void:
 	http.queue_free()
 	print("[main_menu] server.json HTTP ", response_code)
-	if response_code != 200:
-		return
-	var parsed: Variant = JSON.parse_string(body.get_string_from_utf8())
-	if typeof(parsed) != TYPE_DICTIONARY:
-		return
-	var url: String = parsed.get("url", "")
+	var url: String = ""
+	if response_code == 200:
+		var parsed: Variant = JSON.parse_string(body.get_string_from_utf8())
+		if typeof(parsed) == TYPE_DICTIONARY:
+			url = parsed.get("url", "")
 	if url == "":
+		# Don't auto-connect to the dev default; let the user paste a URL.
+		ip_input.placeholder_text = "Enter server URL (e.g. wss://...)"
+		status.text = "Server URL unavailable — paste manually"
+		ip_input.text_changed.connect(_on_manual_ip_changed)
 		return
 	print("[main_menu] loaded server URL: ", url)
 	NetworkManager.default_server_url = url
 	if is_instance_valid(ip_input):
 		ip_input.text = url
+	join_btn.disabled = false
+	status.text = "Press Join to connect"
+
+func _on_manual_ip_changed(new_text: String) -> void:
+	join_btn.disabled = new_text.strip_edges() == ""
 
 func _on_host() -> void:
 	NetworkManager.save_settings()

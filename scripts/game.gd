@@ -6,6 +6,11 @@ const KILLS_TO_WIN := 10
 const NEW_GAME_DELAY := 5.0
 const PLAYER_SCENE := preload("res://scenes/player.tscn")
 
+# Server-authoritative combat constants. Damage is NOT trusted from clients.
+const SERVER_MAX_HEALTH := 100
+const SERVER_BULLET_DAMAGE := 25
+const SERVER_RESPAWN_INVINCIBILITY := 1.5
+
 @onready var spawn_points: Node3D = $SpawnPoints
 @onready var players_root: Node3D = $Players
 @onready var hud: CanvasLayer = $HUD
@@ -43,6 +48,8 @@ func _client_ready(skin_index: int, player_name: String) -> void:
 		if player_name != "":
 			NetworkManager.players[new_peer_id]["name"] = player_name
 		NetworkManager._register_player.rpc(new_peer_id, NetworkManager.players[new_peer_id])
+		# Refresh host's own scoreboard — _register_player is call_remote.
+		NetworkManager.player_list_changed.emit()
 	for pid in NetworkManager.players.keys():
 		if pid == new_peer_id:
 			continue
@@ -88,25 +95,40 @@ func _remote_despawn(peer_id: int) -> void:
 # ─── Combat resolution (server authoritative) ───────────────────────
 
 @rpc("any_peer", "reliable", "call_local")
-func server_report_hit(victim_peer_id: int, damage: int) -> void:
+func server_report_hit(victim_peer_id: int) -> void:
+	# Server-authoritative: damage is NOT taken from the client.
 	if not NetworkManager.is_server() or game_over:
 		return
 	var attacker_peer_id := multiplayer.get_remote_sender_id()
 	if attacker_peer_id == 0:
 		attacker_peer_id = NetworkManager.HOST_PEER_ID
-	var victim := get_player_node(victim_peer_id)
-	if victim == null or victim.health <= 0:
+	if attacker_peer_id == victim_peer_id:
 		return
-	victim.take_damage_remote.rpc_id(victim_peer_id, damage, attacker_peer_id)
-
-@rpc("any_peer", "reliable", "call_local")
-func server_report_death(attacker_peer_id: int) -> void:
-	if not NetworkManager.is_server() or game_over:
+	if not NetworkManager.players.has(attacker_peer_id):
 		return
-	var victim_peer_id := multiplayer.get_remote_sender_id()
-	if victim_peer_id == 0:
-		victim_peer_id = NetworkManager.HOST_PEER_ID
+	if not NetworkManager.players.has(victim_peer_id):
+		return
+	var attacker_info: Dictionary = NetworkManager.players[attacker_peer_id]
+	var victim_info: Dictionary = NetworkManager.players[victim_peer_id]
+	var current_health: int = int(victim_info.get("health", SERVER_MAX_HEALTH))
+	if current_health <= 0:
+		return
+	if bool(victim_info.get("invincible", false)):
+		return
+	# Sanity check: attacker must be alive to land hits.
+	if int(attacker_info.get("health", SERVER_MAX_HEALTH)) <= 0:
+		return
+	var new_health: int = max(0, current_health - SERVER_BULLET_DAMAGE)
+	victim_info["health"] = new_health
+	var victim_node := get_player_node(victim_peer_id)
+	if victim_node:
+		victim_node.take_damage_remote.rpc_id(
+			victim_peer_id, new_health, SERVER_BULLET_DAMAGE, attacker_peer_id)
+	if new_health <= 0:
+		_handle_kill(attacker_peer_id, victim_peer_id)
 
+func _handle_kill(attacker_peer_id: int, victim_peer_id: int) -> void:
+	# Called only from server_report_hit on the server. No client RPC entry.
 	var attacker_info: Dictionary = NetworkManager.players.get(attacker_peer_id, {})
 	var victim_info: Dictionary = NetworkManager.players.get(victim_peer_id, {})
 
@@ -117,12 +139,9 @@ func server_report_death(attacker_peer_id: int) -> void:
 		victim_info["deaths"] += 1
 		NetworkManager.update_score.rpc(victim_peer_id, victim_info["kills"], victim_info["deaths"])
 
-	# Persist to stats.json.
 	var attacker_name: String = attacker_info.get("name", "?") if attacker_info else "?"
 	var victim_name: String = victim_info.get("name", "?") if victim_info else "?"
 	StatsStore.record_kill(attacker_name, victim_name)
-
-	# Tell everyone to display the kill in the feed + center banner.
 	announce_kill.rpc(attacker_peer_id, victim_peer_id)
 
 	if attacker_info and attacker_info.get("kills", 0) >= KILLS_TO_WIN:
@@ -136,7 +155,17 @@ func server_report_death(attacker_peer_id: int) -> void:
 		_schedule_new_game()
 		return
 
+	# Server-driven respawn with invincibility window.
+	if victim_info:
+		victim_info["health"] = SERVER_MAX_HEALTH
+		victim_info["invincible"] = true
 	respawn_player.rpc_id(victim_peer_id, _random_spawn_pos())
+	_clear_invincibility(victim_peer_id)
+
+func _clear_invincibility(peer_id: int) -> void:
+	await get_tree().create_timer(SERVER_RESPAWN_INVINCIBILITY).timeout
+	if NetworkManager.players.has(peer_id):
+		NetworkManager.players[peer_id]["invincible"] = false
 
 @rpc("authority", "reliable", "call_local")
 func announce_kill(attacker_peer_id: int, victim_peer_id: int) -> void:
@@ -185,6 +214,8 @@ func _start_new_game() -> void:
 		hud.hide_winner()
 	if NetworkManager.is_server():
 		for pid in NetworkManager.players.keys():
+			NetworkManager.players[pid]["health"] = SERVER_MAX_HEALTH
+			NetworkManager.players[pid]["invincible"] = false
 			respawn_player.rpc_id(pid, _random_spawn_pos())
 
 # ─── Helpers ─────────────────────────────────────────────────────────

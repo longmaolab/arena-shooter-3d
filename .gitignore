@@ -27,3 +27,5 @@ Thumbs.db
 
 # DO commit: docs/  (the published web build for GitHub Pages)
 # DO commit: export_presets.cfg  (export settings)
+
+.claude/

@@ -152,6 +152,10 @@ func _make_player_entry(skin_index: int = 0, display_name: String = "") -> Dicti
 		"deaths": 0,
 		"color": COLORS[(_next_player_index - 1) % COLORS.size()],
 		"skin_index": skin_index,
+		# Server-authoritative combat state. Only meaningful on the server;
+		# clients see this dict for display fields (name/color/skin) only.
+		"health": 100,
+		"invincible": false,
 	}
 
 func _on_peer_connected(peer_id: int) -> void:
