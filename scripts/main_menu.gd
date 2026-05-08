@@ -91,20 +91,55 @@ func _render_leaderboard(rows: Array) -> void:
 		rank += 1
 
 func _load_default_server_url() -> void:
+	# Web: HTTPRequest's request_completed signal proved unreliable in
+	# Godot 4.6 web export (single-threaded build). Bypass it with the
+	# browser's native fetch via JavaScriptBridge and poll a JS global.
+	# Native: keep the HTTPRequest path so this stays a pure-Godot path.
+	if OS.has_feature("web") and Engine.has_singleton("JavaScriptBridge"):
+		await _load_via_js_fetch()
+	else:
+		_load_via_http_request()
+
+func _load_via_js_fetch() -> void:
+	# Kick off a JS fetch that writes the result to a window-global. We
+	# then poll that global from GDScript with a hard timeout, so Join
+	# never gets stuck disabled if the network hiccups.
+	JavaScriptBridge.eval("""
+		(function() {
+			window.__server_json_result = null;
+			var url = location.origin + location.pathname.replace(/[^/]*$/, '') + 'server.json';
+			fetch(url, {cache: 'no-cache'})
+				.then(function(r){ return r.ok ? r.json() : null; })
+				.then(function(j){ window.__server_json_result = j ? (j.url || '') : ''; })
+				.catch(function(_){ window.__server_json_result = ''; });
+		})();
+	""", true)
+	print("[main_menu] fetching server.json (via JS)")
+	var elapsed := 0.0
+	var tick := 0.1
+	var deadline := 6.0
+	while elapsed < deadline:
+		await get_tree().create_timer(tick).timeout
+		elapsed += tick
+		var result: Variant = JavaScriptBridge.eval("window.__server_json_result", true)
+		if result == null:
+			continue
+		_apply_server_url(String(result))
+		return
+	print("[main_menu] server.json fetch timed out after %.1fs" % elapsed)
+	_apply_server_url("")
+
+func _load_via_http_request() -> void:
 	var http := HTTPRequest.new()
 	add_child(http)
 	http.request_completed.connect(_on_server_json_loaded.bind(http))
 	var url := "server.json"
-	if OS.has_feature("web") and Engine.has_singleton("JavaScriptBridge"):
-		var resolved: Variant = JavaScriptBridge.eval(
-			"location.origin + location.pathname.replace(/[^/]*$/, '') + 'server.json'", true)
-		if typeof(resolved) == TYPE_STRING and resolved != "":
-			url = resolved
 	print("[main_menu] fetching ", url)
 	var err := http.request(url)
 	if err != OK:
 		print("[main_menu] http.request failed: ", err)
 		http.queue_free()
+		_apply_server_url("")
 
 func _on_server_json_loaded(_result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray, http: HTTPRequest) -> void:
 	http.queue_free()
@@ -114,11 +149,14 @@ func _on_server_json_loaded(_result: int, response_code: int, _headers: PackedSt
 		var parsed: Variant = JSON.parse_string(body.get_string_from_utf8())
 		if typeof(parsed) == TYPE_DICTIONARY:
 			url = parsed.get("url", "")
+	_apply_server_url(url)
+
+func _apply_server_url(url: String) -> void:
 	if url == "":
-		# Don't auto-connect to the dev default; let the user paste a URL.
 		ip_input.placeholder_text = "Enter server URL (e.g. wss://...)"
 		status.text = "Server URL unavailable — paste manually"
-		ip_input.text_changed.connect(_on_manual_ip_changed)
+		if not ip_input.text_changed.is_connected(_on_manual_ip_changed):
+			ip_input.text_changed.connect(_on_manual_ip_changed)
 		return
 	print("[main_menu] loaded server URL: ", url)
 	NetworkManager.default_server_url = url
