@@ -9,8 +9,8 @@ signal local_hit_marker()
 
 const SPEED            := 6.0
 const SPRINT_SPEED     := 10.0
-const JUMP_VELOCITY    := 7.0
-const GRAVITY          := 22.0
+const JUMP_VELOCITY    := 8.5
+const GRAVITY          := 24.0
 const MOUSE_SENSITIVITY := 0.0022
 const TOUCH_LOOK_SENSITIVITY := 0.005
 const MAX_HEALTH       := 100
@@ -156,7 +156,10 @@ func _play_anim(name: String) -> void:
 	if not _anim_player.has_animation(name):
 		return
 	_current_anim = name
-	_anim_player.play(name)
+	# Cross-fade between movement anims so idle↔walk↔sprint doesn't pop.
+	# 'die' wants no blend so the snap reads clearly.
+	var blend := 0.0 if name == ANIM_DIE else 0.12
+	_anim_player.play(name, blend)
 
 func _select_anim() -> String:
 	if health <= 0:
@@ -173,13 +176,13 @@ func apply_touch_look(delta_vec: Vector2) -> void:
 		return
 	rotate_y(-delta_vec.x)
 	camera.rotate_x(-delta_vec.y)
-	camera.rotation.x = clamp(camera.rotation.x, -1.4, 1.4)
+	camera.rotation.x = clamp(camera.rotation.x, -1.25, 1.25)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		rotate_y(-event.relative.x * MOUSE_SENSITIVITY)
 		camera.rotate_x(-event.relative.y * MOUSE_SENSITIVITY)
-		camera.rotation.x = clamp(camera.rotation.x, -1.4, 1.4)
+		camera.rotation.x = clamp(camera.rotation.x, -1.25, 1.25)
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED else Input.MOUSE_MODE_CAPTURED
 
@@ -211,7 +214,9 @@ func _physics_process(delta: float) -> void:
 	sync_timer -= delta
 	if sync_timer <= 0.0:
 		sync_timer = SYNC_INTERVAL
-		_remote_state.rpc(global_position, rotation.y, camera.rotation.x, _current_anim)
+		# Don't broadcast position from a node that's been queue_free'd this frame.
+		if is_inside_tree() and not is_queued_for_deletion():
+			_remote_state.rpc(global_position, rotation.y, camera.rotation.x, _current_anim)
 
 @rpc("authority", "unreliable_ordered", "call_remote")
 func _remote_state(pos: Vector3, rot_y: float, cam_x: float, anim_name: String) -> void:
@@ -272,8 +277,8 @@ func _flash_muzzle() -> void:
 	mat.emission_energy_multiplier = 9.0
 	mat.albedo_color.a = 0.9
 	var tw := muzzle.create_tween()
-	tw.tween_property(mat, "emission_energy_multiplier", 0.0, 0.10)
-	tw.parallel().tween_property(mat, "albedo_color:a", 0.0, 0.10)
+	tw.tween_property(mat, "emission_energy_multiplier", 0.0, 0.15)
+	tw.parallel().tween_property(mat, "albedo_color:a", 0.0, 0.15)
 	tw.tween_callback(func():
 		if is_instance_valid(muzzle):
 			muzzle.visible = false)
@@ -336,13 +341,15 @@ func take_damage_remote(new_health: int, amount: int, attacker_peer_id: int) -> 
 	# death sequence itself. We only accept this RPC when it originates from
 	# the server (sender == HOST_PEER_ID for remote, sender == 0 for the host's
 	# own call_local invocation).
+	# Authority check FIRST — never mutate state on a non-authority node, even
+	# if the sender claims to be the server.
+	if not is_multiplayer_authority():
+		return
 	var sender: int = multiplayer.get_remote_sender_id()
 	if sender == 0:
 		if not NetworkManager.is_server():
 			return
 	elif sender != NetworkManager.HOST_PEER_ID:
-		return
-	if not is_multiplayer_authority():
 		return
 	health = new_health
 	local_health_changed.emit(health)

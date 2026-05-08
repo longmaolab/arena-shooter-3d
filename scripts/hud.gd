@@ -13,7 +13,7 @@ extends CanvasLayer
 @onready var hit_marker: Label = $HitMarker
 
 const VIGNETTE_FADE := 0.6
-const DEATH_FADE_IN := 0.15
+const DEATH_FADE_IN := 0.35
 const DEATH_FADE_OUT := 0.4
 const KILL_FEED_LIFETIME := 4.0
 const KILL_BANNER_LIFETIME := 2.5
@@ -71,11 +71,11 @@ func _on_local_player_spawned(p: Node) -> void:
 
 func _on_hit_marker() -> void:
 	hit_marker.modulate.a = 1.0
-	hit_marker.scale = Vector2(1.4, 1.4)
+	hit_marker.scale = Vector2(1.5, 1.5)
 	hit_marker.pivot_offset = hit_marker.size * 0.5
 	var tw := create_tween()
-	tw.tween_property(hit_marker, "scale", Vector2.ONE, 0.12)
-	tw.parallel().tween_property(hit_marker, "modulate:a", 0.0, 0.25)
+	tw.tween_property(hit_marker, "scale", Vector2.ONE, 0.06)
+	tw.parallel().tween_property(hit_marker, "modulate:a", 0.0, 0.14)
 
 func _on_health(h: int) -> void:
 	hp_label.text = "HP: %d" % max(0, h)
@@ -85,7 +85,8 @@ func _on_ammo(a: int) -> void:
 	ammo_label.text = "AMMO: %d" % a
 
 func _on_damage_taken(amount: int) -> void:
-	_vignette_alpha = min(0.7, _vignette_alpha + amount * 0.012)
+	# Cap at 0.45 so a burst of damage doesn't black out the screen.
+	_vignette_alpha = min(0.45, _vignette_alpha + amount * 0.007)
 
 func _on_local_died() -> void:
 	var tw := create_tween()

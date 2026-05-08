@@ -121,7 +121,8 @@ func server_report_hit(victim_peer_id: int) -> void:
 	var new_health: int = max(0, current_health - SERVER_BULLET_DAMAGE)
 	victim_info["health"] = new_health
 	var victim_node := get_player_node(victim_peer_id)
-	if victim_node:
+	# get_player_node may return a node that's already queue_free'd this frame.
+	if victim_node and is_instance_valid(victim_node) and not victim_node.is_queued_for_deletion():
 		victim_node.take_damage_remote.rpc_id(
 			victim_peer_id, new_health, SERVER_BULLET_DAMAGE, attacker_peer_id)
 	if new_health <= 0:

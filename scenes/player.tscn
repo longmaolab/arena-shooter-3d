@@ -56,7 +56,7 @@ cast_shadow = 0
 
 [node name="Audio3D" type="AudioStreamPlayer3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
-unit_size = 8.0
-max_distance = 60.0
+unit_size = 4.0
+max_distance = 50.0
 
 [node name="Audio2D" type="AudioStreamPlayer" parent="."]
