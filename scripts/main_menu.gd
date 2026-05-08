@@ -15,6 +15,7 @@ const SKIN_COUNT := 18
 @onready var lb_empty: Label = $Center/Cols/LeaderboardPanel/LBox/LBEmpty
 
 func _ready() -> void:
+	print("[probe] main_menu build=v641c-cachefix")  # autonomous-rebuild verification
 	if "--server" in OS.get_cmdline_user_args():
 		print("[main_menu] --server flag detected, starting dedicated server")
 		NetworkManager.start_dedicated_server()
