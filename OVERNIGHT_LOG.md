@@ -30,6 +30,8 @@
 | ~60 min | `d569ebb` | v6.4.4 加 `console.log` 诊断（追踪 JS eval 实际行为） |
 | ~75 min | `9545381` | **v6.5 大改：把生产 wss URL 写死进 default**，server.json 降为软覆盖 |
 | ~80 min | `e0ee00f` | v6.5.1 加 cache-bust shim（每个新 build 强制重拉 pck/wasm/js）|
+| ~85 min | `bdbbba9` | log 更新 |
+| ~95 min | `cb299be` | v6.5.2 hit marker tween 不再叠加 + `rebuild_web.sh` 一键脚本 |
 
 ---
 
@@ -133,13 +135,55 @@ git revert e85638d            # 整轮回退
 
 ---
 
-## 下一轮（自动）
+## 第 3 轮：性能 + 资源泄漏 audit
 
-预计 ~30 分钟后再起一轮。每轮做的事：
-1. Chrome MCP 重新加载游戏，看 console 有无新错误
-2. 跑下一个 agent 做更深的 audit
-3. 应用 < 5 个高把握改动
-4. CLI 导出 + push
-5. 更新本日志的"提交时间线"
+派出第 3 个代理，找了 12 个潜在问题。triage 后大多是误报（信号到 freed node 会自动断开、scoreboard 已经用 `_row_cache` 复用 Label、tracer 不挂在 player 下不会被 player 死亡牵连等）。**只应用了 1 个真实问题**：hit marker 在 <140ms 连击时多个 tween 抢夺同一个 scale/alpha 属性 → 修法是新 tween 启动前 kill 旧的。
 
-如果某轮发现严重问题、需要决策、或 export 失败 —— **会立刻停下不再 push**，等你早上看。
+顺手做了一个**工程改进**：写 `scripts/rebuild_web.sh` 一键脚本，把"清缓存 → CLI 导出 → 删 .import → 注 cache-bust"打包，避免下次再栽到 .gdc 缓存的坑里。从此后流程是：
+
+```bash
+./scripts/rebuild_web.sh   # 然后 git add/commit/push
+```
+
+---
+
+## ✅ 验收
+
+线上 v6.5.2 端到端 Chrome MCP 验过：
+- 浏览器加载到新 pck（hash `9708e3c6be4469be`）
+- 控制台日志：`[main_menu] fetching server.json (via JS, soft override)`
+- JS fetch 拿到 `wss://game.boobank.com`
+- Join 按钮可用（IP 框已预填）
+
+朋友访问 https://longmaolab.github.io/arena-shooter-3d/ 应该不需要硬刷新，新 build 立刻可见。
+
+---
+
+## 我没做的（明天可以挑）
+
+- **`_run_invincibility` 重构成单 Tween**：当前 13 次 await 协程 vs. 1 次 tween 回调，性能小赢但风险（视觉闪烁时机可能错位）。
+- **添加 mobile 退出按钮**：当前只能 ESC 退出且仅在 game_over 时生效，手机用户没办法主动退出（虽然有 5s 自动开新局）。
+- **camera bob / 武器后坐力**：手感可以再 +5%，但会需要调试好几轮。
+- **脚步音 / 跳跃音效**：缺资源，需要去 Kenney 或 freesound 找 CC0 文件。
+- **stats.json 每次击杀就落盘**：当前只在 match end 落盘，服务器异常退出会丢一些数据。
+
+---
+
+## 总结一晚共 11 个 commit
+
+| Hash | 改了什么 |
+|---|---|
+| `fc73260` | v6.3 移动端触屏（睡前） |
+| `e85638d` | v6.4 手感 + RPC 竞态修复（9+3 项） |
+| `709333e` → `1a8f384` | v6.4.1 hotfix 加重编（发现 .gdc 缓存陷阱） |
+| `805e245` → `7e464f3` → `d569ebb` | v6.4.2/3/4 调试 server.json fetch 在 Web 端为啥不返回 |
+| `9545381` | **v6.5 把生产 URL 写死，server.json 降级软覆盖** |
+| `e0ee00f` | v6.5.1 cache-bust shim（**朋友升级体验关键**） |
+| `bdbbba9` | log |
+| `cb299be` | v6.5.2 hit marker tween + `rebuild_web.sh` |
+
+所有改动每次都是小步 commit，**任何一项你觉得不对都能 `git revert <hash>` 单独退掉**。`OVERNIGHT_LOG.md` 自身也是 tracked 的，你早上就能看到这份。
+
+`KIDS_GUIDE.md` 没动 —— 等你看完再决定要不要把 v6.4–v6.5 的内容补进附录。
+
+晚安 🌙
