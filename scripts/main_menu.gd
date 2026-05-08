@@ -102,44 +102,51 @@ func _load_default_server_url() -> void:
 		_load_via_http_request()
 
 func _load_via_js_fetch() -> void:
-	# JS fetch + poll a string sentinel. We force the JS side to always
-	# return a String (never null/undefined) because JavaScriptBridge.eval
-	# is finicky about marshalling JS null into Godot's Variant null.
+	print("[main_menu] fetching server.json (via JS)")
+	# Diagnostic 1: can eval write a string? (round-trip)
+	JavaScriptBridge.eval("window.__diag = 'hello-from-eval'", true)
+	var d1: Variant = JavaScriptBridge.eval("window.__diag", true)
+	print("[diag] eval write/read result: type=%s val='%s'" % [typeof(d1), String(d1) if d1 != null else "<null>"])
+	# Diagnostic 2: trigger a console.log so we know the JS code runs
+	JavaScriptBridge.eval("console.log('[js eval] diag console.log fired')", true)
+	# Now the actual fetch
 	JavaScriptBridge.eval("""
+		window.__sj_status = 'pending';
+		window.__sj_url = '';
 		(function() {
-			window.__sj_status = 'pending';
-			window.__sj_url = '';
 			var u = location.origin + location.pathname.replace(/[^/]*$/, '') + 'server.json';
+			console.log('[js fetch] starting', u);
 			fetch(u, {cache: 'no-cache'})
-				.then(function(r){ if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+				.then(function(r){ console.log('[js fetch] got response', r.status); if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
 				.then(function(j){
 					window.__sj_url = (j && j.url) ? String(j.url) : '';
 					window.__sj_status = 'done';
-					console.log('[js fetch] server.json done:', window.__sj_url);
+					console.log('[js fetch] resolved:', window.__sj_url);
 				})
 				.catch(function(e){
 					window.__sj_status = 'error';
-					console.log('[js fetch] server.json failed:', String(e));
+					console.log('[js fetch] rejected:', String(e));
 				});
 		})();
 	""", true)
-	print("[main_menu] fetching server.json (via JS)")
 	var elapsed := 0.0
 	var tick := 0.15
 	var deadline := 6.0
 	while elapsed < deadline:
 		await get_tree().create_timer(tick).timeout
 		elapsed += tick
-		var status_v: Variant = JavaScriptBridge.eval("String(window.__sj_status||'')", false)
+		var status_v: Variant = JavaScriptBridge.eval("String(window.__sj_status||'')", true)
 		var status_s := String(status_v) if status_v != null else ""
 		if status_s == "pending" or status_s == "":
 			continue
-		var url_v: Variant = JavaScriptBridge.eval("String(window.__sj_url||'')", false)
+		var url_v: Variant = JavaScriptBridge.eval("String(window.__sj_url||'')", true)
 		var url_s := String(url_v) if url_v != null else ""
 		print("[main_menu] server.json status=%s url='%s'" % [status_s, url_s])
 		_apply_server_url(url_s)
 		return
-	print("[main_menu] server.json fetch timed out after %.1fs" % elapsed)
+	# Pre-timeout poke so we can see what status got stuck at
+	var final_status: Variant = JavaScriptBridge.eval("String(window.__sj_status||'<undef>')", true)
+	print("[main_menu] server.json timed out, final status='%s'" % String(final_status))
 	_apply_server_url("")
 
 func _load_via_http_request() -> void:
