@@ -5,6 +5,7 @@ signal local_ammo_changed(new_ammo: int)
 signal local_damage_taken(amount: int)
 signal local_died()
 signal local_respawned()
+signal local_hit_marker()
 
 const SPEED            := 6.0
 const SPRINT_SPEED     := 10.0
@@ -129,6 +130,16 @@ func apply_skin(skin_index: int) -> void:
 					anim.loop_mode = Animation.LOOP_LINEAR
 		_play_anim(ANIM_IDLE)
 
+func _find_player_root(node: Node) -> CharacterBody3D:
+	# Kenney GLB body parts come with their own StaticBody3D colliders,
+	# so the ray hits a child node rather than the player root.
+	var n: Node = node
+	while n:
+		if n is CharacterBody3D and n.is_in_group("player"):
+			return n
+		n = n.get_parent()
+	return null
+
 func _find_animation_player(node: Node) -> AnimationPlayer:
 	if node is AnimationPlayer:
 		return node
@@ -219,25 +230,77 @@ func _try_shoot() -> void:
 	can_shoot = false
 	ammo -= 1
 	local_ammo_changed.emit(ammo)
-	_fire_fx.rpc()
 	ray.force_raycast_update()
+	var start_pos: Vector3 = muzzle.global_position
+	var end_pos: Vector3
+	var hit_normal := Vector3.UP
+	var hit_player := false
 	if ray.is_colliding():
-		var target: Object = ray.get_collider()
-		if target and target is CharacterBody3D and target != self and target.is_in_group("player"):
-			var victim_peer_id: int = target.get_multiplayer_authority()
+		end_pos = ray.get_collision_point()
+		hit_normal = ray.get_collision_normal()
+		var victim := _find_player_root(ray.get_collider() as Node)
+		if victim and victim != self:
+			hit_player = true
+			var victim_peer_id: int = victim.get_multiplayer_authority()
 			_game.server_report_hit.rpc_id(NetworkManager.HOST_PEER_ID, victim_peer_id, BULLET_DAMAGE)
-		_spawn_impact(ray.get_collision_point(), ray.get_collision_normal())
+	else:
+		end_pos = camera.global_position + (-camera.global_transform.basis.z) * 80.0
+	_fire_fx.rpc(start_pos, end_pos, hit_player)
+	if ray.is_colliding() and not hit_player:
+		_spawn_impact(end_pos, hit_normal)
+	if hit_player:
+		local_hit_marker.emit()
 	await get_tree().create_timer(FIRE_RATE).timeout
 	can_shoot = true
 
 @rpc("any_peer", "unreliable", "call_local")
-func _fire_fx() -> void:
-	muzzle.visible = true
+func _fire_fx(start: Vector3, end: Vector3, hit_player: bool) -> void:
 	audio_3d.stream = SFX_SHOOT
 	audio_3d.play()
-	await get_tree().create_timer(0.05).timeout
-	if is_instance_valid(muzzle):
-		muzzle.visible = false
+	_spawn_tracer(start, end, hit_player)
+	_flash_muzzle()
+
+func _flash_muzzle() -> void:
+	if not is_instance_valid(muzzle):
+		return
+	var mat: StandardMaterial3D = muzzle.material_override as StandardMaterial3D
+	if mat == null:
+		return
+	muzzle.visible = true
+	mat.emission_energy_multiplier = 9.0
+	mat.albedo_color.a = 0.9
+	var tw := muzzle.create_tween()
+	tw.tween_property(mat, "emission_energy_multiplier", 0.0, 0.10)
+	tw.parallel().tween_property(mat, "albedo_color:a", 0.0, 0.10)
+	tw.tween_callback(func():
+		if is_instance_valid(muzzle):
+			muzzle.visible = false)
+
+func _spawn_tracer(start: Vector3, end: Vector3, hit_player: bool) -> void:
+	var dist := start.distance_to(end)
+	if dist < 0.5:
+		return
+	var tracer := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.05, 0.05, dist)
+	tracer.mesh = bm
+	tracer.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var mat := StandardMaterial3D.new()
+	var color := Color(1, 0.4, 0.4) if hit_player else Color(1, 0.95, 0.5)
+	mat.albedo_color = color
+	mat.emission_enabled = true
+	mat.emission = color
+	mat.emission_energy_multiplier = 5.0
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	tracer.material_override = mat
+	get_tree().current_scene.add_child(tracer)
+	tracer.global_position = (start + end) * 0.5
+	tracer.look_at(end, Vector3.UP, true)
+	var tw := tracer.create_tween()
+	tw.tween_property(mat, "albedo_color:a", 0.0, 0.12)
+	tw.parallel().tween_property(mat, "emission_energy_multiplier", 0.0, 0.12)
+	tw.tween_callback(tracer.queue_free)
 
 func _spawn_impact(pos: Vector3, normal: Vector3) -> void:
 	var impact := MeshInstance3D.new()

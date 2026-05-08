@@ -10,6 +10,7 @@ extends CanvasLayer
 @onready var kill_banner: Label = $KillBanner
 @onready var lb_panel: PanelContainer = $LeaderboardPanel
 @onready var lb_rows: VBoxContainer = $LeaderboardPanel/LBox/LBRows
+@onready var hit_marker: Label = $HitMarker
 
 const VIGNETTE_FADE := 0.6
 const DEATH_FADE_IN := 0.15
@@ -63,8 +64,18 @@ func _on_local_player_spawned(p: Node) -> void:
 		p.local_died.connect(_on_local_died)
 	if not p.local_respawned.is_connected(_on_local_respawned):
 		p.local_respawned.connect(_on_local_respawned)
+	if not p.local_hit_marker.is_connected(_on_hit_marker):
+		p.local_hit_marker.connect(_on_hit_marker)
 	_on_health(p.health)
 	_on_ammo(p.ammo)
+
+func _on_hit_marker() -> void:
+	hit_marker.modulate.a = 1.0
+	hit_marker.scale = Vector2(1.4, 1.4)
+	hit_marker.pivot_offset = hit_marker.size * 0.5
+	var tw := create_tween()
+	tw.tween_property(hit_marker, "scale", Vector2.ONE, 0.12)
+	tw.parallel().tween_property(hit_marker, "modulate:a", 0.0, 0.25)
 
 func _on_health(h: int) -> void:
 	hp_label.text = "HP: %d" % max(0, h)

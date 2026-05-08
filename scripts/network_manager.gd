@@ -41,13 +41,26 @@ var local_skin_index: int = 0
 var local_player_name: String = "Player"
 
 const SETTINGS_FILE := "user://settings.cfg"
+const SKIN_COUNT := 18
+const COMMON_NAMES := [
+	"Alex", "Jordan", "Taylor", "Casey", "Riley", "Morgan", "Sam", "Charlie",
+	"Drew", "Jamie", "Pat", "Robin", "Quinn", "Avery", "Blake", "Cameron",
+	"Devon", "Reese", "Jesse", "Skyler", "Max", "Leo", "Mia", "Zoe",
+]
 
 func load_settings() -> void:
+	# Sticky if the user already customized (saved file exists with name key),
+	# otherwise pick a random common name + skin so first-time players and
+	# multi-window tests don't all show up as identical "Player"s.
 	var cfg := ConfigFile.new()
-	if cfg.load(SETTINGS_FILE) != OK:
-		return
-	local_player_name = cfg.get_value("player", "name", "Player")
-	local_skin_index = cfg.get_value("player", "skin_index", 0)
+	if cfg.load(SETTINGS_FILE) == OK and cfg.has_section_key("player", "name"):
+		local_player_name = cfg.get_value("player", "name", "")
+		local_skin_index = cfg.get_value("player", "skin_index", 0)
+		if local_player_name != "":
+			return
+	randomize()
+	local_player_name = COMMON_NAMES[randi() % COMMON_NAMES.size()]
+	local_skin_index = randi() % SKIN_COUNT
 
 func save_settings() -> void:
 	var cfg := ConfigFile.new()
