@@ -22,6 +22,7 @@ config/features=PackedStringArray("4.6", "Forward Plus")
 
 InputSetup="*res://scripts/input_setup.gd"
 NetworkManager="*res://scripts/network_manager.gd"
+StatsStore="*res://scripts/stats_store.gd"
 
 [rendering]
 

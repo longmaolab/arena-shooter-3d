@@ -22,8 +22,18 @@ const RESPAWN_INVINCIBILITY := 1.5
 
 const SKIN_COUNT := 18
 const SKIN_PATH_PREFIX := "res://models/characters/character-"
-# Tunes character size to roughly fit the 1.7-unit-tall capsule.
 const MODEL_SCALE := 0.95
+
+const ANIM_IDLE := "idle"
+const ANIM_WALK := "walk"
+const ANIM_SPRINT := "sprint"
+const ANIM_DIE := "die"
+const LOOPED_ANIMS := [ANIM_IDLE, ANIM_WALK, ANIM_SPRINT]
+
+const SFX_SHOOT := preload("res://audio/shoot.ogg")
+const SFX_HIT := preload("res://audio/hit.ogg")
+const SFX_DEATH := preload("res://audio/death.ogg")
+const SFX_RESPAWN := preload("res://audio/respawn.ogg")
 
 var health: int = MAX_HEALTH
 var ammo: int = MAX_AMMO
@@ -33,15 +43,18 @@ var is_invincible: bool = false
 var sync_timer: float = 0.0
 var _game: Node = null
 var _current_skin: int = -1
+var _anim_player: AnimationPlayer = null
+var _current_anim: String = ""
 
 @onready var camera: Camera3D = $Camera3D
 @onready var ray: RayCast3D = $Camera3D/RayCast3D
 @onready var muzzle: MeshInstance3D = $Camera3D/MuzzleFlash
 @onready var model_holder: Node3D = $ModelHolder
 @onready var name_label: Label3D = $NameLabel
+@onready var audio_3d: AudioStreamPlayer3D = $Audio3D
+@onready var audio_2d: AudioStreamPlayer = $Audio2D
 
 static func skin_letter(idx: int) -> String:
-	# 0 -> 'a', 1 -> 'b', ..., 17 -> 'r'
 	var clamped: int = clamp(idx, 0, SKIN_COUNT - 1)
 	return String.chr("a".unicode_at(0) + clamped)
 
@@ -58,7 +71,6 @@ func _setup_authority_visuals() -> void:
 	_game = get_tree().get_first_node_in_group("game")
 	if is_multiplayer_authority():
 		add_to_group("local_player")
-		# First-person: hide our own body and name tag.
 		model_holder.visible = false
 		name_label.visible = false
 		camera.current = true
@@ -105,8 +117,44 @@ func apply_skin(skin_index: int) -> void:
 		return
 	var model: Node3D = scene.instantiate()
 	model.scale = Vector3.ONE * MODEL_SCALE
-	# Kenney blocky characters are pivot-on-feet, so no Y offset needed.
 	model_holder.add_child(model)
+	# Wire up the AnimationPlayer baked into the GLB.
+	_anim_player = _find_animation_player(model)
+	if _anim_player:
+		# Make movement anims loop; one-shots like 'die' stay one-shot.
+		for n in _anim_player.get_animation_list():
+			if n in LOOPED_ANIMS:
+				var anim := _anim_player.get_animation(n)
+				if anim:
+					anim.loop_mode = Animation.LOOP_LINEAR
+		_play_anim(ANIM_IDLE)
+
+func _find_animation_player(node: Node) -> AnimationPlayer:
+	if node is AnimationPlayer:
+		return node
+	for c in node.get_children():
+		var found := _find_animation_player(c)
+		if found:
+			return found
+	return null
+
+func _play_anim(name: String) -> void:
+	if _anim_player == null or name == _current_anim:
+		return
+	if not _anim_player.has_animation(name):
+		return
+	_current_anim = name
+	_anim_player.play(name)
+
+func _select_anim() -> String:
+	if health <= 0:
+		return ANIM_DIE
+	var horizontal := Vector2(velocity.x, velocity.z).length()
+	if horizontal > 7.5:
+		return ANIM_SPRINT
+	if horizontal > 0.4:
+		return ANIM_WALK
+	return ANIM_IDLE
 
 func apply_touch_look(delta_vec: Vector2) -> void:
 	if not is_multiplayer_authority():
@@ -141,6 +189,8 @@ func _physics_process(delta: float) -> void:
 
 	move_and_slide()
 
+	_play_anim(_select_anim())
+
 	if Input.is_action_pressed("shoot"):
 		_try_shoot()
 	if Input.is_action_just_pressed("reload"):
@@ -149,13 +199,14 @@ func _physics_process(delta: float) -> void:
 	sync_timer -= delta
 	if sync_timer <= 0.0:
 		sync_timer = SYNC_INTERVAL
-		_remote_state.rpc(global_position, rotation.y, camera.rotation.x)
+		_remote_state.rpc(global_position, rotation.y, camera.rotation.x, _current_anim)
 
 @rpc("authority", "unreliable_ordered", "call_remote")
-func _remote_state(pos: Vector3, rot_y: float, cam_x: float) -> void:
+func _remote_state(pos: Vector3, rot_y: float, cam_x: float, anim_name: String) -> void:
 	global_position = pos
 	rotation.y = rot_y
 	camera.rotation.x = cam_x
+	_play_anim(anim_name)
 
 # ─── Shooting ────────────────────────────────────────────────────────
 
@@ -168,7 +219,7 @@ func _try_shoot() -> void:
 	can_shoot = false
 	ammo -= 1
 	local_ammo_changed.emit(ammo)
-	_flash_muzzle.rpc()
+	_fire_fx.rpc()
 	ray.force_raycast_update()
 	if ray.is_colliding():
 		var target: Object = ray.get_collider()
@@ -180,8 +231,10 @@ func _try_shoot() -> void:
 	can_shoot = true
 
 @rpc("any_peer", "unreliable", "call_local")
-func _flash_muzzle() -> void:
+func _fire_fx() -> void:
 	muzzle.visible = true
+	audio_3d.stream = SFX_SHOOT
+	audio_3d.play()
 	await get_tree().create_timer(0.05).timeout
 	if is_instance_valid(muzzle):
 		muzzle.visible = false
@@ -219,18 +272,27 @@ func take_damage_remote(amount: int, attacker_peer_id: int) -> void:
 	health -= amount
 	local_health_changed.emit(health)
 	local_damage_taken.emit(amount)
+	_play_hit_sfx.rpc()
 	if health <= 0:
 		_show_death.rpc()
 		local_died.emit()
 		_game.server_report_death.rpc_id(NetworkManager.HOST_PEER_ID, attacker_peer_id)
 
+@rpc("any_peer", "unreliable", "call_local")
+func _play_hit_sfx() -> void:
+	audio_3d.stream = SFX_HIT
+	audio_3d.play()
+
 @rpc("any_peer", "reliable", "call_local")
 func _show_death() -> void:
-	# Hide the body for everyone — local player sees first-person view; others see them vanish.
+	# Hide body for everyone (1st-person already hides for self).
 	if is_instance_valid(model_holder):
 		model_holder.visible = false
 	if is_instance_valid(name_label):
 		name_label.visible = false
+	# Play death sound to everyone via 3D audio at this spot.
+	audio_3d.stream = SFX_DEATH
+	audio_3d.play()
 
 func respawn_at(pos: Vector3) -> void:
 	if not is_multiplayer_authority():
@@ -242,12 +304,14 @@ func respawn_at(pos: Vector3) -> void:
 	local_health_changed.emit(health)
 	local_ammo_changed.emit(ammo)
 	local_respawned.emit()
+	# Local-only respawn chime.
+	audio_2d.stream = SFX_RESPAWN
+	audio_2d.play()
 	_show_respawn.rpc()
 	_run_invincibility()
 
 @rpc("authority", "reliable", "call_local")
 func _show_respawn() -> void:
-	# Local player still hides own body (1st person); others see model again.
 	if not is_multiplayer_authority():
 		model_holder.visible = true
 		name_label.visible = true

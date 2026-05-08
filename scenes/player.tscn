@@ -46,3 +46,10 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.25, -0.18, -0.5)
 visible = false
 mesh = SubResource("muzzle_mesh")
 material_override = SubResource("muzzle_mat")
+
+[node name="Audio3D" type="AudioStreamPlayer3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
+unit_size = 8.0
+max_distance = 60.0
+
+[node name="Audio2D" type="AudioStreamPlayer" parent="."]

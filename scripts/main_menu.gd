@@ -2,32 +2,40 @@ extends Control
 
 const SKIN_COUNT := 18
 
-@onready var ip_input: LineEdit = $Center/Panel/VBox/IPInput
-@onready var status: Label = $Center/Panel/VBox/Status
-@onready var host_btn: Button = $Center/Panel/VBox/HostBtn
-@onready var join_btn: Button = $Center/Panel/VBox/JoinBtn
-@onready var skin_prev: Button = $Center/Panel/VBox/SkinPicker/PrevBtn
-@onready var skin_next: Button = $Center/Panel/VBox/SkinPicker/NextBtn
-@onready var skin_preview: TextureRect = $Center/Panel/VBox/SkinPicker/PreviewBg/Preview
-@onready var skin_name: Label = $Center/Panel/VBox/SkinName
+@onready var ip_input: LineEdit = $Center/Cols/Panel/VBox/IPInput
+@onready var status: Label = $Center/Cols/Panel/VBox/Status
+@onready var host_btn: Button = $Center/Cols/Panel/VBox/HostBtn
+@onready var join_btn: Button = $Center/Cols/Panel/VBox/JoinBtn
+@onready var name_input: LineEdit = $Center/Cols/Panel/VBox/NameInput
+@onready var skin_prev: Button = $Center/Cols/Panel/VBox/SkinPicker/PrevBtn
+@onready var skin_next: Button = $Center/Cols/Panel/VBox/SkinPicker/NextBtn
+@onready var skin_preview: TextureRect = $Center/Cols/Panel/VBox/SkinPicker/PreviewBg/Preview
+@onready var skin_name: Label = $Center/Cols/Panel/VBox/SkinName
+@onready var lb_rows: VBoxContainer = $Center/Cols/LeaderboardPanel/LBox/LBRows
+@onready var lb_empty: Label = $Center/Cols/LeaderboardPanel/LBox/LBEmpty
 
 func _ready() -> void:
-	# If launched as dedicated server, skip the menu entirely.
 	if "--server" in OS.get_cmdline_user_args():
 		print("[main_menu] --server flag detected, starting dedicated server")
 		NetworkManager.start_dedicated_server()
 		return
+
+	NetworkManager.load_settings()
 
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	host_btn.pressed.connect(_on_host)
 	join_btn.pressed.connect(_on_join)
 	skin_prev.pressed.connect(func(): _change_skin(-1))
 	skin_next.pressed.connect(func(): _change_skin(1))
+	name_input.text_changed.connect(_on_name_changed)
 	NetworkManager.connection_failed.connect(_on_failed)
 	NetworkManager.disconnected.connect(_on_disconnected)
+	StatsStore.leaderboard_updated.connect(_render_leaderboard)
 
+	name_input.text = NetworkManager.local_player_name
 	ip_input.text = NetworkManager.default_server_url
 	_refresh_skin()
+	_render_leaderboard(StatsStore.cached_leaderboard)
 
 	if OS.has_feature("web"):
 		host_btn.disabled = true
@@ -37,9 +45,14 @@ func _ready() -> void:
 	else:
 		status.text = "Pick Host or Join"
 
+func _on_name_changed(new_text: String) -> void:
+	NetworkManager.local_player_name = new_text.strip_edges()
+	NetworkManager.save_settings()
+
 func _change_skin(delta: int) -> void:
 	NetworkManager.local_skin_index = (NetworkManager.local_skin_index + delta + SKIN_COUNT) % SKIN_COUNT
 	_refresh_skin()
+	NetworkManager.save_settings()
 
 func _refresh_skin() -> void:
 	var idx := NetworkManager.local_skin_index
@@ -50,12 +63,32 @@ func _refresh_skin() -> void:
 		skin_preview.texture = tex
 	skin_name.text = "Skin %s  (%d/%d)" % [letter.to_upper(), idx + 1, SKIN_COUNT]
 
+func _render_leaderboard(rows: Array) -> void:
+	for c in lb_rows.get_children():
+		c.queue_free()
+	if rows.is_empty():
+		lb_empty.visible = true
+		return
+	lb_empty.visible = false
+	var rank := 1
+	for row in rows:
+		var l := Label.new()
+		l.text = "%d.  %-12s  %3d  %3d  %3d" % [
+			rank,
+			String(row.get("name", "?")).left(12),
+			int(row.get("wins", 0)),
+			int(row.get("kills", 0)),
+			int(row.get("deaths", 0)),
+		]
+		l.add_theme_font_size_override("font_size", 14)
+		l.add_theme_color_override("font_color", Color(1, 1, 1) if rank > 3 else Color(1, 0.85, 0.3))
+		lb_rows.add_child(l)
+		rank += 1
+
 func _load_default_server_url() -> void:
 	var http := HTTPRequest.new()
 	add_child(http)
 	http.request_completed.connect(_on_server_json_loaded.bind(http))
-	# HTTPRequest needs an absolute URL — relative paths resolve to the site
-	# root (e.g. github.io/server.json), not to our subpath.
 	var url := "server.json"
 	if OS.has_feature("web") and Engine.has_singleton("JavaScriptBridge"):
 		var resolved: Variant = JavaScriptBridge.eval(
@@ -75,11 +108,9 @@ func _on_server_json_loaded(_result: int, response_code: int, _headers: PackedSt
 		return
 	var parsed: Variant = JSON.parse_string(body.get_string_from_utf8())
 	if typeof(parsed) != TYPE_DICTIONARY:
-		print("[main_menu] server.json not a dict")
 		return
 	var url: String = parsed.get("url", "")
 	if url == "":
-		print("[main_menu] server.json has no 'url'")
 		return
 	print("[main_menu] loaded server URL: ", url)
 	NetworkManager.default_server_url = url
@@ -87,12 +118,14 @@ func _on_server_json_loaded(_result: int, response_code: int, _headers: PackedSt
 		ip_input.text = url
 
 func _on_host() -> void:
+	NetworkManager.save_settings()
 	status.text = "Starting server..."
 	var err := NetworkManager.host_game()
 	if err != OK:
 		status.text = "Host failed: %s" % err
 
 func _on_join() -> void:
+	NetworkManager.save_settings()
 	var addr := ip_input.text.strip_edges()
 	if addr == "":
 		addr = NetworkManager.default_server_url

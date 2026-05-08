@@ -74,6 +74,21 @@ grow_horizontal = 0
 [node name="Scoreboard" type="VBoxContainer" parent="Right"]
 alignment = 0
 
+[node name="KillFeed" type="MarginContainer" parent="."]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -300
+offset_top = 240
+offset_right = -18
+offset_bottom = 460
+grow_horizontal = 0
+mouse_filter = 2
+
+[node name="Items" type="VBoxContainer" parent="KillFeed"]
+alignment = 0
+theme_override_constants/separation = 4
+
 [node name="Crosshair" type="Label" parent="."]
 anchors_preset = 8
 anchor_left = 0.5
@@ -92,6 +107,24 @@ theme_override_colors/font_color = Color(1, 1, 1, 0.85)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 4
 
+[node name="KillBanner" type="Label" parent="."]
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -260
+offset_top = -200
+offset_right = 260
+offset_bottom = -140
+text = ""
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 32
+theme_override_colors/font_color = Color(1, 1, 0.4, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 6
+
 [node name="CenterLabel" type="Label" parent="."]
 anchors_preset = 8
 anchor_left = 0.5
@@ -109,3 +142,25 @@ theme_override_font_sizes/font_size = 48
 theme_override_colors/font_color = Color(1, 1, 0.4, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 8
+
+[node name="LeaderboardPanel" type="PanelContainer" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200
+offset_top = 60
+offset_right = 200
+offset_bottom = 360
+
+[node name="LBox" type="VBoxContainer" parent="LeaderboardPanel"]
+theme_override_constants/separation = 6
+
+[node name="LBTitle" type="Label" parent="LeaderboardPanel/LBox"]
+text = "🏆 LEADERBOARD"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
+
+[node name="LBRows" type="VBoxContainer" parent="LeaderboardPanel/LBox"]

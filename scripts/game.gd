@@ -14,7 +14,6 @@ var game_over: bool = false
 
 func _ready() -> void:
 	add_to_group("game")
-	# Dedicated server: no local player, no HUD, no touch controls.
 	if NetworkManager.is_dedicated:
 		hud.queue_free()
 		var tc := get_node_or_null("TouchControls")
@@ -25,21 +24,25 @@ func _ready() -> void:
 	hud.bind_to_game(self)
 
 	if NetworkManager.is_server():
-		# Local-host (non-dedicated) mode: server is also a player.
 		_do_spawn(NetworkManager.HOST_PEER_ID, _random_spawn_pos())
+		# Push current leaderboard to host's HUD too.
+		push_leaderboard.rpc(StatsStore.get_top())
 	else:
-		_client_ready.rpc_id(NetworkManager.HOST_PEER_ID, NetworkManager.local_skin_index)
+		_client_ready.rpc_id(NetworkManager.HOST_PEER_ID,
+			NetworkManager.local_skin_index,
+			NetworkManager.local_player_name)
 
 @rpc("any_peer", "reliable", "call_remote")
-func _client_ready(skin_index: int) -> void:
+func _client_ready(skin_index: int, player_name: String) -> void:
 	if not NetworkManager.is_server():
 		return
 	var new_peer_id := multiplayer.get_remote_sender_id()
-	# Record this client's chosen skin and re-broadcast their info.
+	# Update the entry the server pre-created with this client's identity.
 	if NetworkManager.players.has(new_peer_id):
 		NetworkManager.players[new_peer_id]["skin_index"] = skin_index
+		if player_name != "":
+			NetworkManager.players[new_peer_id]["name"] = player_name
 		NetworkManager._register_player.rpc(new_peer_id, NetworkManager.players[new_peer_id])
-	# Catch the new client up on every existing player.
 	for pid in NetworkManager.players.keys():
 		if pid == new_peer_id:
 			continue
@@ -47,6 +50,8 @@ func _client_ready(skin_index: int) -> void:
 		if existing:
 			_remote_spawn.rpc_id(new_peer_id, pid, existing.global_position)
 	_remote_spawn.rpc(new_peer_id, _random_spawn_pos())
+	# Send the new client the current leaderboard.
+	push_leaderboard.rpc_id(new_peer_id, StatsStore.get_top())
 
 func server_despawn_player(peer_id: int) -> void:
 	if not NetworkManager.is_server():
@@ -101,20 +106,42 @@ func server_report_death(attacker_peer_id: int) -> void:
 	var victim_peer_id := multiplayer.get_remote_sender_id()
 	if victim_peer_id == 0:
 		victim_peer_id = NetworkManager.HOST_PEER_ID
+
 	var attacker_info: Dictionary = NetworkManager.players.get(attacker_peer_id, {})
 	var victim_info: Dictionary = NetworkManager.players.get(victim_peer_id, {})
+
 	if attacker_info and attacker_peer_id != victim_peer_id:
 		attacker_info["kills"] += 1
 		NetworkManager.update_score.rpc(attacker_peer_id, attacker_info["kills"], attacker_info["deaths"])
 	if victim_info:
 		victim_info["deaths"] += 1
 		NetworkManager.update_score.rpc(victim_peer_id, victim_info["kills"], victim_info["deaths"])
+
+	# Persist to stats.json.
+	var attacker_name: String = attacker_info.get("name", "?") if attacker_info else "?"
+	var victim_name: String = victim_info.get("name", "?") if victim_info else "?"
+	StatsStore.record_kill(attacker_name, victim_name)
+
+	# Tell everyone to display the kill in the feed + center banner.
+	announce_kill.rpc(attacker_peer_id, victim_peer_id)
+
 	if attacker_info and attacker_info.get("kills", 0) >= KILLS_TO_WIN:
 		game_over = true
+		var participant_names: Array = []
+		for pid in NetworkManager.players.keys():
+			participant_names.append(NetworkManager.players[pid].get("name", "?"))
+		StatsStore.record_match_end(attacker_name, participant_names)
 		announce_winner.rpc(attacker_peer_id)
+		push_leaderboard.rpc(StatsStore.get_top())
 		_schedule_new_game()
 		return
+
 	respawn_player.rpc_id(victim_peer_id, _random_spawn_pos())
+
+@rpc("authority", "reliable", "call_local")
+func announce_kill(attacker_peer_id: int, victim_peer_id: int) -> void:
+	if hud and is_instance_valid(hud):
+		hud.show_kill(attacker_peer_id, victim_peer_id)
 
 @rpc("authority", "reliable", "call_local")
 func announce_winner(peer_id: int) -> void:
@@ -123,17 +150,22 @@ func announce_winner(peer_id: int) -> void:
 		hud.show_winner(peer_id)
 
 @rpc("authority", "reliable", "call_local")
+func push_leaderboard(rows: Array) -> void:
+	StatsStore.update_cached_leaderboard(rows)
+	if hud and is_instance_valid(hud):
+		hud.show_leaderboard(rows)
+
+@rpc("authority", "reliable", "call_local")
 func respawn_player(pos: Vector3) -> void:
 	var node := get_player_node(multiplayer.get_unique_id())
 	if node:
 		node.respawn_at(pos)
 
-# ─── New-game cycle (server-driven) ─────────────────────────────────
+# ─── New-game cycle ─────────────────────────────────────────────────
 
 func _schedule_new_game() -> void:
 	if not NetworkManager.is_server():
 		return
-	# Tell everyone to show a countdown banner.
 	new_game_countdown.rpc(NEW_GAME_DELAY)
 	await get_tree().create_timer(NEW_GAME_DELAY).timeout
 	if not is_inside_tree():
@@ -151,7 +183,6 @@ func _start_new_game() -> void:
 	NetworkManager.reset_all_scores()
 	if hud and is_instance_valid(hud):
 		hud.hide_winner()
-	# Server respawns everyone at fresh positions.
 	if NetworkManager.is_server():
 		for pid in NetworkManager.players.keys():
 			respawn_player.rpc_id(pid, _random_spawn_pos())

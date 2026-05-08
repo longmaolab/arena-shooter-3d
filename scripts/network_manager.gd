@@ -36,6 +36,25 @@ var default_server_url: String = "ws://127.0.0.1:%d" % PORT
 # The skin the local player picked in the main menu (0..17 → character-a..r).
 var local_skin_index: int = 0
 
+# Display name typed by the user in the main menu (used in scoreboard and
+# leaderboard). Empty falls back to auto "Player N".
+var local_player_name: String = "Player"
+
+const SETTINGS_FILE := "user://settings.cfg"
+
+func load_settings() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load(SETTINGS_FILE) != OK:
+		return
+	local_player_name = cfg.get_value("player", "name", "Player")
+	local_skin_index = cfg.get_value("player", "skin_index", 0)
+
+func save_settings() -> void:
+	var cfg := ConfigFile.new()
+	cfg.set_value("player", "name", local_player_name)
+	cfg.set_value("player", "skin_index", local_skin_index)
+	cfg.save(SETTINGS_FILE)
+
 func is_server() -> bool:
 	return multiplayer.multiplayer_peer != null and multiplayer.is_server()
 
@@ -44,7 +63,7 @@ func host_game() -> int:
 	var err := _create_server()
 	if err != OK:
 		return err
-	players[HOST_PEER_ID] = _make_player_entry(local_skin_index)
+	players[HOST_PEER_ID] = _make_player_entry(local_skin_index, local_player_name)
 	get_tree().change_scene_to_file(GAME_SCENE)
 	return OK
 
@@ -111,10 +130,11 @@ func _wire_signals() -> void:
 	if not multiplayer.server_disconnected.is_connected(_on_server_disconnected):
 		multiplayer.server_disconnected.connect(_on_server_disconnected)
 
-func _make_player_entry(skin_index: int = 0) -> Dictionary:
+func _make_player_entry(skin_index: int = 0, display_name: String = "") -> Dictionary:
 	_next_player_index += 1
+	var resolved_name: String = display_name if display_name != "" else "Player %d" % _next_player_index
 	return {
-		"name": "P%d" % _next_player_index,
+		"name": resolved_name,
 		"kills": 0,
 		"deaths": 0,
 		"color": COLORS[(_next_player_index - 1) % COLORS.size()],
