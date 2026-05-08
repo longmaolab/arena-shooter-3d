@@ -36,20 +36,35 @@ func _load_default_server_url() -> void:
 	var http := HTTPRequest.new()
 	add_child(http)
 	http.request_completed.connect(_on_server_json_loaded.bind(http))
-	var err := http.request("server.json")
+	# HTTPRequest needs an absolute URL — relative paths resolve to the site
+	# root (e.g. github.io/server.json), not to our subpath. Build it from
+	# window.location so it works whether the build lives at /, /arena/, etc.
+	var url := "server.json"
+	if OS.has_feature("web") and Engine.has_singleton("JavaScriptBridge"):
+		var resolved: Variant = JavaScriptBridge.eval(
+			"location.origin + location.pathname.replace(/[^/]*$/, '') + 'server.json'", true)
+		if typeof(resolved) == TYPE_STRING and resolved != "":
+			url = resolved
+	print("[main_menu] fetching ", url)
+	var err := http.request(url)
 	if err != OK:
+		print("[main_menu] http.request failed: ", err)
 		http.queue_free()
 
 func _on_server_json_loaded(_result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray, http: HTTPRequest) -> void:
 	http.queue_free()
+	print("[main_menu] server.json HTTP ", response_code)
 	if response_code != 200:
 		return
 	var parsed: Variant = JSON.parse_string(body.get_string_from_utf8())
 	if typeof(parsed) != TYPE_DICTIONARY:
+		print("[main_menu] server.json not a dict")
 		return
 	var url: String = parsed.get("url", "")
 	if url == "":
+		print("[main_menu] server.json has no 'url'")
 		return
+	print("[main_menu] loaded server URL: ", url)
 	NetworkManager.default_server_url = url
 	if is_instance_valid(ip_input):
 		ip_input.text = url
