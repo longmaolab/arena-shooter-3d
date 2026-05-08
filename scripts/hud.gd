@@ -14,6 +14,8 @@ const DEATH_FADE_OUT := 0.4
 var local_player: Node = null
 var _row_cache: Dictionary = {}
 var _vignette_alpha: float = 0.0
+var _countdown_left: float = 0.0
+var _show_countdown_text: bool = false
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -25,6 +27,9 @@ func _process(delta: float) -> void:
 	if _vignette_alpha > 0.0:
 		_vignette_alpha = max(0.0, _vignette_alpha - delta / VIGNETTE_FADE)
 		damage_vignette.modulate.a = _vignette_alpha
+	if _show_countdown_text:
+		_countdown_left = max(0.0, _countdown_left - delta)
+		_render_countdown()
 
 func bind_to_game(g: Node) -> void:
 	if not NetworkManager.player_list_changed.is_connected(_refresh_scoreboard):
@@ -56,7 +61,6 @@ func _on_ammo(a: int) -> void:
 	ammo_label.text = "AMMO: %d" % a
 
 func _on_damage_taken(amount: int) -> void:
-	# Punch-up the vignette proportional to damage; cap at 0.7 alpha.
 	_vignette_alpha = min(0.7, _vignette_alpha + amount * 0.012)
 
 func _on_local_died() -> void:
@@ -107,12 +111,32 @@ func _make_styled_label(text: String, font_size: int, color: Color) -> Label:
 func show_winner(peer_id: int) -> void:
 	center_label.visible = true
 	if peer_id == multiplayer.get_unique_id():
-		center_label.text = "VICTORY!\nPress Esc to leave"
+		center_label.text = "VICTORY!"
 		center_label.modulate = Color(0.4, 1, 0.4)
 	else:
 		var winner_name := "P?"
 		if NetworkManager.players.has(peer_id):
 			winner_name = NetworkManager.players[peer_id]["name"]
-		center_label.text = "%s WINS\nPress Esc to leave" % winner_name
+		center_label.text = "%s WINS" % winner_name
 		center_label.modulate = Color(1, 0.6, 0.6)
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+func hide_winner() -> void:
+	center_label.visible = false
+	_show_countdown_text = false
+	_countdown_left = 0.0
+
+func show_countdown(seconds: float) -> void:
+	_countdown_left = seconds
+	_show_countdown_text = true
+	_render_countdown()
+
+func _render_countdown() -> void:
+	if not center_label.visible:
+		center_label.visible = true
+	var existing := center_label.text
+	# Preserve any leading "VICTORY!" / "PX WINS" line, append countdown.
+	var lines := existing.split("\n")
+	var head := lines[0] if lines.size() > 0 else ""
+	if head == "" or head.contains("Next"):
+		head = "Next match"
+	center_label.text = "%s\nNext match in %d..." % [head, ceil(_countdown_left)]

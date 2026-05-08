@@ -3,6 +3,7 @@ extends Node3D
 signal local_player_spawned(player: Node)
 
 const KILLS_TO_WIN := 10
+const NEW_GAME_DELAY := 5.0
 const PLAYER_SCENE := preload("res://scenes/player.tscn")
 
 @onready var spawn_points: Node3D = $SpawnPoints
@@ -13,9 +14,18 @@ var game_over: bool = false
 
 func _ready() -> void:
 	add_to_group("game")
+	# Dedicated server: no local player, no HUD, no touch controls.
+	if NetworkManager.is_dedicated:
+		hud.queue_free()
+		var tc := get_node_or_null("TouchControls")
+		if tc:
+			tc.queue_free()
+		return
+
 	hud.bind_to_game(self)
 
 	if NetworkManager.is_server():
+		# Local-host (non-dedicated) mode: server is also a player.
 		_do_spawn(NetworkManager.HOST_PEER_ID, _random_spawn_pos())
 	else:
 		_client_ready.rpc_id(NetworkManager.HOST_PEER_ID)
@@ -25,14 +35,13 @@ func _client_ready() -> void:
 	if not NetworkManager.is_server():
 		return
 	var new_peer_id := multiplayer.get_remote_sender_id()
-	# Catch the new client up on every existing player (server-side truth)
+	# Catch the new client up on every existing player.
 	for pid in NetworkManager.players.keys():
 		if pid == new_peer_id:
 			continue
 		var existing := get_player_node(pid)
 		if existing:
 			_remote_spawn.rpc_id(new_peer_id, pid, existing.global_position)
-	# Broadcast new player spawn to everyone (call_local: also creates on host)
 	_remote_spawn.rpc(new_peer_id, _random_spawn_pos())
 
 func server_despawn_player(peer_id: int) -> void:
@@ -45,7 +54,6 @@ func _do_spawn(peer_id: int, spawn_pos: Vector3) -> void:
 		return
 	var p := PLAYER_SCENE.instantiate()
 	p.name = str(peer_id)
-	# Authority must be set BEFORE add_child so _ready() reads it correctly.
 	p.set_multiplayer_authority(peer_id)
 	players_root.add_child(p, true)
 	p.global_position = spawn_pos
@@ -86,7 +94,6 @@ func server_report_death(attacker_peer_id: int) -> void:
 	var victim_peer_id := multiplayer.get_remote_sender_id()
 	if victim_peer_id == 0:
 		victim_peer_id = NetworkManager.HOST_PEER_ID
-	# Update scores (authoritative)
 	var attacker_info: Dictionary = NetworkManager.players.get(attacker_peer_id, {})
 	var victim_info: Dictionary = NetworkManager.players.get(victim_peer_id, {})
 	if attacker_info and attacker_peer_id != victim_peer_id:
@@ -95,25 +102,54 @@ func server_report_death(attacker_peer_id: int) -> void:
 	if victim_info:
 		victim_info["deaths"] += 1
 		NetworkManager.update_score.rpc(victim_peer_id, victim_info["kills"], victim_info["deaths"])
-	# Win check
 	if attacker_info and attacker_info.get("kills", 0) >= KILLS_TO_WIN:
 		game_over = true
 		announce_winner.rpc(attacker_peer_id)
+		_schedule_new_game()
 		return
 	respawn_player.rpc_id(victim_peer_id, _random_spawn_pos())
 
 @rpc("authority", "reliable", "call_local")
 func announce_winner(peer_id: int) -> void:
 	game_over = true
-	hud.show_winner(peer_id)
+	if hud and is_instance_valid(hud):
+		hud.show_winner(peer_id)
 
 @rpc("authority", "reliable", "call_local")
 func respawn_player(pos: Vector3) -> void:
-	# call_local lets the host respawn themselves when they're the victim.
-	# rpc_id targets only the victim, so only they execute this.
 	var node := get_player_node(multiplayer.get_unique_id())
 	if node:
 		node.respawn_at(pos)
+
+# ─── New-game cycle (server-driven) ─────────────────────────────────
+
+func _schedule_new_game() -> void:
+	if not NetworkManager.is_server():
+		return
+	# Tell everyone to show a countdown banner.
+	new_game_countdown.rpc(NEW_GAME_DELAY)
+	await get_tree().create_timer(NEW_GAME_DELAY).timeout
+	if not is_inside_tree():
+		return
+	_start_new_game.rpc()
+
+@rpc("authority", "reliable", "call_local")
+func new_game_countdown(seconds: float) -> void:
+	if hud and is_instance_valid(hud):
+		hud.show_countdown(seconds)
+
+@rpc("authority", "reliable", "call_local")
+func _start_new_game() -> void:
+	game_over = false
+	NetworkManager.reset_all_scores()
+	if hud and is_instance_valid(hud):
+		hud.hide_winner()
+	# Server respawns everyone at fresh positions.
+	if NetworkManager.is_server():
+		for pid in NetworkManager.players.keys():
+			respawn_player.rpc_id(pid, _random_spawn_pos())
+
+# ─── Helpers ─────────────────────────────────────────────────────────
 
 func _random_spawn_pos() -> Vector3:
 	var pts := spawn_points.get_children()

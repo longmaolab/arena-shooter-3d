@@ -55,9 +55,11 @@ text = "Join  (enter host's address)"
 theme_override_font_sizes/font_size = 16
 
 [node name="IPInput" type="LineEdit" parent="Center/Panel/VBox"]
-placeholder_text = "127.0.0.1  or  wss://abc.ngrok.io"
-text = "127.0.0.1"
+placeholder_text = "auto-loaded from server.json"
+text = ""
 theme_override_font_sizes/font_size = 18
+virtual_keyboard_enabled = true
+virtual_keyboard_show_on_focus = true
 
 [node name="JoinBtn" type="Button" parent="Center/Panel/VBox"]
 text = "Join"

@@ -1,75 +1,78 @@
 # Arena Shooter 3D
 
-用 Godot 4.6 写的第一人称竞技场对战，**支持联机 PvP**。  
-玩法：4 人 PvP，先达到 10 杀获胜。
+第一人称竞技场对战，**最多 8 人 PvP**。  
+用 Godot 4.6 + WebSocket 做的客户端-服务器架构。
 
-## 怎么跑起来（Mac）
+🎮 **现场玩**：https://longmaolab.github.io/arena-shooter-3d/
 
-1. **下载 Godot 4.6**：https://godotengine.org/download/macos/
-2. 打开 Godot，点 **Import**，选本目录的 `project.godot`
-3. 在 **调试** 菜单 → **运行多个实例** → 选 **2**
-4. 按 **⌘+B** 一次开两个窗口
-5. 窗口 1 → 点 **Host**
-6. 窗口 2 → 点 **Join**（IP 默认 `127.0.0.1`）
-7. 互射对打
+（需要服务器在线，见下方指南）
 
-## 操作
+## 怎么玩
 
-| 键位 | 动作 |
-|---|---|
-| W A S D | 前后左右移动 |
-| 鼠标 | 视角 |
-| 空格 | 跳跃 |
-| Shift | 冲刺 |
-| 鼠标左键 | 射击 |
-| R | 换弹 |
-| Esc | 释放/捕获鼠标 |
-| Enter | 游戏结束后返回菜单 |
+| 设备 | 移动 | 视角 | 跳跃 | 射击 | 换弹 |
+|---|---|---|---|---|---|
+| 电脑 | WASD | 鼠标 | 空格 | 左键 | R |
+| 手机 | 左下虚拟摇杆 | 右半屏滑动 | 蓝键 | 红键 | 黄键 |
 
-## 游戏机制
+**胜利条件**：先到 10 杀。胜利后 5 秒倒计时自动开始下一局。
 
-- **玩家**：100 HP，30 发弹夹，伤害 25/发，换弹 1.4 秒
-- **联机架构**：WebSocket，Host/Client 模式，服务器权威伤害判定
-- **死亡复活**：HP 归零后瞬移到随机出生点，无敌期 0
-- **胜利条件**：先到 10 杀
-
-## 想自己改？打开这些文件
-
-| 想改什么 | 改哪个文件 |
-|---|---|
-| 玩家速度/血量/伤害/换弹时间 | `scripts/player.gd` 顶部 const |
-| 胜利条件、最大玩家数 | `scripts/game.gd`、`scripts/network_manager.gd` |
-| 地图布局 | 在 Godot 里打开 `scenes/game.tscn`，拖动 CSGBox3D 节点 |
-| 颜色 | `scenes/game.tscn` 里的 Material 资源 |
-| 计分板 / HUD | `scripts/hud.gd` + `scenes/hud.tscn` |
-| 主菜单外观 | `scripts/main_menu.gd` + `scenes/main_menu.tscn` |
-
-## 项目结构
+## 文件总览
 
 ```
 arena-shooter-3d/
-├── project.godot
+├── project.godot          Godot 项目入口
+├── export_presets.cfg     Web 导出配置
+├── run_server.sh          ← 一键启动服务器（Mac）
+├── deploy.sh              ← 一键推送 docs/ 到 GitHub Pages
+├── docs/                  ← Web 客户端构建产物（GitHub Pages 服务）
+│   └── server.json        ← 当前服务器 URL（每次开服更新）
 ├── scenes/
-│   ├── main_menu.tscn   主菜单（Host/Join）
-│   ├── game.tscn        竞技场地图
-│   ├── player.tscn      联网玩家
-│   └── hud.tscn         HUD + 计分板
+│   ├── main_menu.tscn     主菜单
+│   ├── game.tscn          竞技场
+│   ├── player.tscn        玩家
+│   ├── hud.tscn           HUD + 计分板
+│   └── touch_controls.tscn 手机触屏 UI
 └── scripts/
-    ├── input_setup.gd      autoload：注册按键
-    ├── network_manager.gd  autoload：联网状态
-    ├── main_menu.gd
-    ├── game.gd            场景调度 / 计分 / 胜利判定
-    ├── player.gd          玩家移动 / 射击 / 受伤
-    └── hud.gd             血量 / 弹药 / 计分榜
+    ├── input_setup.gd     按键映射 (autoload)
+    ├── network_manager.gd 联网状态 (autoload)
+    ├── main_menu.gd       主菜单逻辑 + --server 启动检测
+    ├── game.gd            场景调度 + 计分 + 新开局
+    ├── player.gd          玩家移动 + 射击 + 受伤反馈
+    ├── hud.gd             HUD + 屏幕受伤提示
+    └── touch_controls.gd  虚拟摇杆
 ```
 
-## 下一步可以加什么
+## 自己跑（本机调试）
 
-- [ ] 死亡视觉反馈（受击闪红、复活无敌）
-- [ ] 武器切换（手枪 / 散弹 / 狙击）
-- [ ] 拾取道具（医疗包、弹药盒）
-- [ ] 多张地图 + 投票系统
-- [ ] 触屏控制（手机能玩）
-- [ ] **Web 导出 + 部署到 Cloudflare Pages**（让外网同学打开链接就能玩）
-- [ ] 角色模型 + 动画（Mixamo 免费下）
-- [ ] 房间码系统（不用记 IP）
+1. Godot 4.6 打开 `project.godot`
+2. **调试 → 运行多个实例 → 2**
+3. ⌘+B 同时开两个窗口
+4. 窗口 1 → Host
+5. 窗口 2 → Join（IP 默认 127.0.0.1）
+
+## 跟同学联机
+
+完整步骤见 **[SERVER_GUIDE.md](SERVER_GUIDE.md)**：
+
+简版：
+1. `./run_server.sh` 跑服务器
+2. `cloudflared tunnel --url http://localhost:7777` 暴露成公网
+3. 把得到的 URL 写进 `docs/server.json`，git push
+4. 把 https://longmaolab.github.io/arena-shooter-3d/ 发给同学
+
+## 部署 Web 客户端
+
+```bash
+# 1. 在 Godot 里：项目 → 导出 → Web → 导出项目（路径默认 docs/index.html）
+# 2. 推送：
+./deploy.sh
+```
+
+## 进阶 / TODO
+
+- [ ] 多房间系统（房间码加入）
+- [ ] 永久服务器 URL（Cloudflare 命名隧道）
+- [ ] 武器切换
+- [ ] 死亡音效（拖个 freesound.org 的 .ogg 进去）
+- [ ] 角色模型 + 动画
+- [ ] 24h 在线服务器（Fly.io / Hetzner VPS）

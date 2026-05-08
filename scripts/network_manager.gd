@@ -3,29 +3,62 @@ extends Node
 signal player_list_changed()
 signal connection_failed()
 signal disconnected()
+signal default_url_loaded(url: String)
 
 const PORT := 7777
-const MAX_PLAYERS := 4
+const MAX_PLAYERS := 8
 const HOST_PEER_ID := 1
 const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
 const GAME_SCENE := "res://scenes/game.tscn"
 
 const COLORS := [
-	Color(0.30, 0.70, 1.00),  # blue
-	Color(1.00, 0.55, 0.30),  # orange
-	Color(0.50, 1.00, 0.40),  # green
-	Color(1.00, 0.40, 0.85),  # pink
+	Color(0.30, 0.70, 1.00),
+	Color(1.00, 0.55, 0.30),
+	Color(0.50, 1.00, 0.40),
+	Color(1.00, 0.40, 0.85),
+	Color(0.85, 0.85, 0.85),
+	Color(1.00, 0.85, 0.30),
+	Color(0.60, 0.40, 1.00),
+	Color(0.30, 1.00, 0.85),
 ]
 
 # peer_id -> { name, kills, deaths, color }
 var players: Dictionary = {}
-# Monotonic counter — guarantees stable, unique P# names even after disconnects.
 var _next_player_index: int = 0
+
+# Set true when this Godot instance is the dedicated headless server
+# (no local player, no HUD). See start_dedicated_server().
+var is_dedicated: bool = false
+
+# Default server URL loaded from docs/server.json on web start.
+# Pre-filled into the IP input box so users can just press Join.
+var default_server_url: String = "ws://127.0.0.1:%d" % PORT
 
 func is_server() -> bool:
 	return multiplayer.multiplayer_peer != null and multiplayer.is_server()
 
+# Local 2-window testing host (also spawns a host player).
 func host_game() -> int:
+	var err := _create_server()
+	if err != OK:
+		return err
+	players[HOST_PEER_ID] = _make_player_entry()
+	get_tree().change_scene_to_file(GAME_SCENE)
+	return OK
+
+# Headless dedicated server. No local player; pure referee.
+# Triggered by `godot --headless -- --server` on the Mac.
+func start_dedicated_server() -> int:
+	is_dedicated = true
+	var err := _create_server()
+	if err != OK:
+		push_error("Dedicated server failed to start: %s" % err)
+		return err
+	print("[server] listening on port %d" % PORT)
+	get_tree().change_scene_to_file(GAME_SCENE)
+	return OK
+
+func _create_server() -> int:
 	var peer := WebSocketMultiplayerPeer.new()
 	var err := peer.create_server(PORT)
 	if err != OK:
@@ -33,8 +66,6 @@ func host_game() -> int:
 		return err
 	multiplayer.multiplayer_peer = peer
 	_wire_signals()
-	players[HOST_PEER_ID] = _make_player_entry()
-	get_tree().change_scene_to_file(GAME_SCENE)
 	return OK
 
 func join_game(host_input: String) -> int:
@@ -48,11 +79,7 @@ func join_game(host_input: String) -> int:
 	_wire_signals()
 	return OK
 
-# Accept any of:
-#   "127.0.0.1"            → ws://127.0.0.1:7777
-#   "192.168.1.10:7777"    → ws://192.168.1.10:7777
-#   "ws://host:port"       → as-is
-#   "wss://abc.ngrok.io"   → as-is (TLS, e.g. through ngrok for browser play)
+# Accept "127.0.0.1", "host:port", "ws://...", or "wss://...".
 func _resolve_url(raw: String) -> String:
 	if raw.begins_with("ws://") or raw.begins_with("wss://"):
 		return raw
@@ -66,6 +93,7 @@ func leave_game() -> void:
 		multiplayer.multiplayer_peer = null
 	players.clear()
 	_next_player_index = 0
+	is_dedicated = false
 	if get_tree().current_scene and get_tree().current_scene.scene_file_path != MAIN_MENU_SCENE:
 		get_tree().change_scene_to_file(MAIN_MENU_SCENE)
 
@@ -95,9 +123,7 @@ func _on_peer_connected(peer_id: int) -> void:
 		return
 	players[peer_id] = _make_player_entry()
 	player_list_changed.emit()
-	# Single RPC: send the entire roster to the new peer (avoids N+1).
 	_register_all_players.rpc_id(peer_id, players)
-	# Tell existing peers about the new joiner.
 	_register_player.rpc(peer_id, players[peer_id])
 
 func _on_peer_disconnected(peer_id: int) -> void:
@@ -139,4 +165,11 @@ func update_score(peer_id: int, kills: int, deaths: int) -> void:
 		return
 	players[peer_id]["kills"] = kills
 	players[peer_id]["deaths"] = deaths
+	player_list_changed.emit()
+
+@rpc("authority", "reliable", "call_local")
+func reset_all_scores() -> void:
+	for pid in players.keys():
+		players[pid]["kills"] = 0
+		players[pid]["deaths"] = 0
 	player_list_changed.emit()
