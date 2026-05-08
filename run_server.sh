@@ -6,7 +6,29 @@
 set -e
 cd "$(dirname "$0")"
 
-# Find Godot.app in common locations.
+PORT="${PORT:-7777}"
+
+# ---- Free the port if a previous server is still holding it ----
+existing_pids=$(lsof -nP -tiTCP:"$PORT" -sTCP:LISTEN 2>/dev/null || true)
+if [ -n "$existing_pids" ]; then
+  echo "⚠️  Port $PORT is held by PID(s): $existing_pids"
+  echo "   (likely a leftover server from a previous run)"
+  echo "   Killing..."
+  # shellcheck disable=SC2086
+  kill $existing_pids 2>/dev/null || true
+  sleep 1
+  # If anything still hangs on, force-kill.
+  remaining=$(lsof -nP -tiTCP:"$PORT" -sTCP:LISTEN 2>/dev/null || true)
+  if [ -n "$remaining" ]; then
+    # shellcheck disable=SC2086
+    kill -9 $remaining 2>/dev/null || true
+    sleep 1
+  fi
+  echo "✓ Port $PORT freed."
+  echo ""
+fi
+
+# ---- Find Godot.app in common locations ----
 if [ -n "$GODOT_BIN" ] && [ -x "$GODOT_BIN" ]; then
   : # use env var as-is
 else
@@ -23,7 +45,6 @@ else
       break
     fi
   done
-  # Fallback: spotlight search.
   if [ -z "$GODOT_BIN" ]; then
     APP=$(mdfind "kMDItemFSName == 'Godot.app'" 2>/dev/null | head -1)
     if [ -n "$APP" ] && [ -x "$APP/Contents/MacOS/Godot" ]; then
@@ -33,14 +54,13 @@ else
 fi
 
 if [ -z "$GODOT_BIN" ] || [ ! -x "$GODOT_BIN" ]; then
-  echo "❌ Godot not found"
-  echo "   Set GODOT_BIN env var, e.g.:"
+  echo "❌ Godot not found. Set GODOT_BIN env var, e.g.:"
   echo "   GODOT_BIN=/path/to/Godot.app/Contents/MacOS/Godot ./run_server.sh"
   exit 1
 fi
 
-echo "→ Starting headless game server on port 7777..."
+echo "→ Starting headless game server on port $PORT..."
 echo "   (Godot: $GODOT_BIN)"
 echo "   (Ctrl+C to stop)"
 echo ""
-"$GODOT_BIN" --headless --path . -- --server
+exec "$GODOT_BIN" --headless --path . -- --server

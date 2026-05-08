@@ -28,13 +28,17 @@ func _ready() -> void:
 		# Local-host (non-dedicated) mode: server is also a player.
 		_do_spawn(NetworkManager.HOST_PEER_ID, _random_spawn_pos())
 	else:
-		_client_ready.rpc_id(NetworkManager.HOST_PEER_ID)
+		_client_ready.rpc_id(NetworkManager.HOST_PEER_ID, NetworkManager.local_skin_index)
 
 @rpc("any_peer", "reliable", "call_remote")
-func _client_ready() -> void:
+func _client_ready(skin_index: int) -> void:
 	if not NetworkManager.is_server():
 		return
 	var new_peer_id := multiplayer.get_remote_sender_id()
+	# Record this client's chosen skin and re-broadcast their info.
+	if NetworkManager.players.has(new_peer_id):
+		NetworkManager.players[new_peer_id]["skin_index"] = skin_index
+		NetworkManager._register_player.rpc(new_peer_id, NetworkManager.players[new_peer_id])
 	# Catch the new client up on every existing player.
 	for pid in NetworkManager.players.keys():
 		if pid == new_peer_id:
@@ -59,7 +63,10 @@ func _do_spawn(peer_id: int, spawn_pos: Vector3) -> void:
 	p.global_position = spawn_pos
 	if NetworkManager.players.has(peer_id):
 		var info: Dictionary = NetworkManager.players[peer_id]
-		p.apply_identity(info.get("name", "P?"), info.get("color", Color.WHITE))
+		p.apply_identity(
+			info.get("name", "P?"),
+			info.get("color", Color.WHITE),
+			info.get("skin_index", 0))
 	if peer_id == multiplayer.get_unique_id():
 		local_player_spawned.emit(p)
 

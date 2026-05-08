@@ -3,7 +3,6 @@ extends Node
 signal player_list_changed()
 signal connection_failed()
 signal disconnected()
-signal default_url_loaded(url: String)
 
 const PORT := 7777
 const MAX_PLAYERS := 8
@@ -22,7 +21,7 @@ const COLORS := [
 	Color(0.30, 1.00, 0.85),
 ]
 
-# peer_id -> { name, kills, deaths, color }
+# peer_id -> { name, kills, deaths, color, skin_index }
 var players: Dictionary = {}
 var _next_player_index: int = 0
 
@@ -34,6 +33,9 @@ var is_dedicated: bool = false
 # Pre-filled into the IP input box so users can just press Join.
 var default_server_url: String = "ws://127.0.0.1:%d" % PORT
 
+# The skin the local player picked in the main menu (0..17 → character-a..r).
+var local_skin_index: int = 0
+
 func is_server() -> bool:
 	return multiplayer.multiplayer_peer != null and multiplayer.is_server()
 
@@ -42,7 +44,7 @@ func host_game() -> int:
 	var err := _create_server()
 	if err != OK:
 		return err
-	players[HOST_PEER_ID] = _make_player_entry()
+	players[HOST_PEER_ID] = _make_player_entry(local_skin_index)
 	get_tree().change_scene_to_file(GAME_SCENE)
 	return OK
 
@@ -109,13 +111,14 @@ func _wire_signals() -> void:
 	if not multiplayer.server_disconnected.is_connected(_on_server_disconnected):
 		multiplayer.server_disconnected.connect(_on_server_disconnected)
 
-func _make_player_entry() -> Dictionary:
+func _make_player_entry(skin_index: int = 0) -> Dictionary:
 	_next_player_index += 1
 	return {
 		"name": "P%d" % _next_player_index,
 		"kills": 0,
 		"deaths": 0,
 		"color": COLORS[(_next_player_index - 1) % COLORS.size()],
+		"skin_index": skin_index,
 	}
 
 func _on_peer_connected(peer_id: int) -> void:

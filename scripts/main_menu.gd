@@ -1,9 +1,15 @@
 extends Control
 
+const SKIN_COUNT := 18
+
 @onready var ip_input: LineEdit = $Center/Panel/VBox/IPInput
 @onready var status: Label = $Center/Panel/VBox/Status
 @onready var host_btn: Button = $Center/Panel/VBox/HostBtn
 @onready var join_btn: Button = $Center/Panel/VBox/JoinBtn
+@onready var skin_prev: Button = $Center/Panel/VBox/SkinPicker/PrevBtn
+@onready var skin_next: Button = $Center/Panel/VBox/SkinPicker/NextBtn
+@onready var skin_preview: TextureRect = $Center/Panel/VBox/SkinPicker/PreviewBg/Preview
+@onready var skin_name: Label = $Center/Panel/VBox/SkinName
 
 func _ready() -> void:
 	# If launched as dedicated server, skip the menu entirely.
@@ -15,13 +21,14 @@ func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	host_btn.pressed.connect(_on_host)
 	join_btn.pressed.connect(_on_join)
+	skin_prev.pressed.connect(func(): _change_skin(-1))
+	skin_next.pressed.connect(func(): _change_skin(1))
 	NetworkManager.connection_failed.connect(_on_failed)
 	NetworkManager.disconnected.connect(_on_disconnected)
 
-	# Pre-fill the input with the default server URL.
 	ip_input.text = NetworkManager.default_server_url
+	_refresh_skin()
 
-	# Hosts can't run in browsers (no listening sockets allowed).
 	if OS.has_feature("web"):
 		host_btn.disabled = true
 		host_btn.text = "Host (desktop only)"
@@ -30,15 +37,25 @@ func _ready() -> void:
 	else:
 		status.text = "Pick Host or Join"
 
-# Web build only: load `server.json` from the same origin so users don't
-# have to type the server URL on mobile.
+func _change_skin(delta: int) -> void:
+	NetworkManager.local_skin_index = (NetworkManager.local_skin_index + delta + SKIN_COUNT) % SKIN_COUNT
+	_refresh_skin()
+
+func _refresh_skin() -> void:
+	var idx := NetworkManager.local_skin_index
+	var letter := String.chr("a".unicode_at(0) + idx)
+	var path := "res://models/characters/previews/character-%s.png" % letter
+	var tex: Texture2D = load(path) as Texture2D
+	if tex:
+		skin_preview.texture = tex
+	skin_name.text = "Skin %s  (%d/%d)" % [letter.to_upper(), idx + 1, SKIN_COUNT]
+
 func _load_default_server_url() -> void:
 	var http := HTTPRequest.new()
 	add_child(http)
 	http.request_completed.connect(_on_server_json_loaded.bind(http))
 	# HTTPRequest needs an absolute URL — relative paths resolve to the site
-	# root (e.g. github.io/server.json), not to our subpath. Build it from
-	# window.location so it works whether the build lives at /, /arena/, etc.
+	# root (e.g. github.io/server.json), not to our subpath.
 	var url := "server.json"
 	if OS.has_feature("web") and Engine.has_singleton("JavaScriptBridge"):
 		var resolved: Variant = JavaScriptBridge.eval(

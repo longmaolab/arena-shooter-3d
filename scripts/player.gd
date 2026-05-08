@@ -19,7 +19,11 @@ const FIRE_RATE        := 0.12
 const BULLET_DAMAGE    := 25
 const SYNC_INTERVAL    := 0.05
 const RESPAWN_INVINCIBILITY := 1.5
-const DEATH_HIDE_TIME  := 0.4
+
+const SKIN_COUNT := 18
+const SKIN_PATH_PREFIX := "res://models/characters/character-"
+# Tunes character size to roughly fit the 1.7-unit-tall capsule.
+const MODEL_SCALE := 0.95
 
 var health: int = MAX_HEALTH
 var ammo: int = MAX_AMMO
@@ -28,13 +32,21 @@ var is_reloading: bool = false
 var is_invincible: bool = false
 var sync_timer: float = 0.0
 var _game: Node = null
+var _current_skin: int = -1
 
 @onready var camera: Camera3D = $Camera3D
 @onready var ray: RayCast3D = $Camera3D/RayCast3D
 @onready var muzzle: MeshInstance3D = $Camera3D/MuzzleFlash
-@onready var body_mesh: MeshInstance3D = $BodyMesh
-@onready var head_mesh: MeshInstance3D = $HeadMesh
+@onready var model_holder: Node3D = $ModelHolder
 @onready var name_label: Label3D = $NameLabel
+
+static func skin_letter(idx: int) -> String:
+	# 0 -> 'a', 1 -> 'b', ..., 17 -> 'r'
+	var clamped: int = clamp(idx, 0, SKIN_COUNT - 1)
+	return String.chr("a".unicode_at(0) + clamped)
+
+static func skin_path(idx: int) -> String:
+	return "%s%s.glb" % [SKIN_PATH_PREFIX, skin_letter(idx)]
 
 func _ready() -> void:
 	add_to_group("player")
@@ -46,8 +58,8 @@ func _setup_authority_visuals() -> void:
 	_game = get_tree().get_first_node_in_group("game")
 	if is_multiplayer_authority():
 		add_to_group("local_player")
-		body_mesh.visible = false
-		head_mesh.visible = false
+		# First-person: hide our own body and name tag.
+		model_holder.visible = false
 		name_label.visible = false
 		camera.current = true
 		_grab_mouse()
@@ -63,7 +75,6 @@ func _notification(what: int) -> void:
 		return
 	if not is_inside_tree() or not is_multiplayer_authority():
 		return
-	# Don't fight the touch UI for mouse mode on mobile.
 	if DisplayServer.is_touchscreen_available():
 		return
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
@@ -73,19 +84,30 @@ func _notification(what: int) -> void:
 
 func _grab_mouse() -> void:
 	if DisplayServer.is_touchscreen_available():
-		return  # Touch devices don't capture mouse.
+		return
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
-func apply_identity(player_name: String, color: Color) -> void:
+func apply_identity(player_name: String, color: Color, skin_index: int) -> void:
 	name_label.text = player_name
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = color
-	mat.metallic = 0.2
-	mat.roughness = 0.5
-	body_mesh.material_override = mat
-	head_mesh.material_override = mat
+	name_label.modulate = color
+	apply_skin(skin_index)
 
-# Used by touch_controls.gd on mobile/web.
+func apply_skin(skin_index: int) -> void:
+	if skin_index == _current_skin and model_holder.get_child_count() > 0:
+		return
+	_current_skin = skin_index
+	for c in model_holder.get_children():
+		c.queue_free()
+	var path := skin_path(skin_index)
+	var scene: PackedScene = load(path) as PackedScene
+	if scene == null:
+		push_warning("Skin not found: " + path)
+		return
+	var model: Node3D = scene.instantiate()
+	model.scale = Vector3.ONE * MODEL_SCALE
+	# Kenney blocky characters are pivot-on-feet, so no Y offset needed.
+	model_holder.add_child(model)
+
 func apply_touch_look(delta_vec: Vector2) -> void:
 	if not is_multiplayer_authority():
 		return
@@ -197,30 +219,18 @@ func take_damage_remote(amount: int, attacker_peer_id: int) -> void:
 	health -= amount
 	local_health_changed.emit(health)
 	local_damage_taken.emit(amount)
-	_flash_hit.rpc()
 	if health <= 0:
 		_show_death.rpc()
 		local_died.emit()
 		_game.server_report_death.rpc_id(NetworkManager.HOST_PEER_ID, attacker_peer_id)
 
-# Visible to ALL peers — body briefly flashes white when hit.
-@rpc("any_peer", "unreliable", "call_local")
-func _flash_hit() -> void:
-	var mat := body_mesh.material_override
-	if not (mat is StandardMaterial3D):
-		return
-	var smat: StandardMaterial3D = mat
-	var orig: Color = smat.albedo_color
-	smat.albedo_color = Color(1.5, 1.5, 1.5)
-	await get_tree().create_timer(0.08).timeout
-	if is_instance_valid(self) and is_instance_valid(body_mesh) and body_mesh.material_override == smat:
-		smat.albedo_color = orig
-
 @rpc("any_peer", "reliable", "call_local")
 func _show_death() -> void:
-	body_mesh.visible = false
-	head_mesh.visible = false
-	name_label.visible = false
+	# Hide the body for everyone — local player sees first-person view; others see them vanish.
+	if is_instance_valid(model_holder):
+		model_holder.visible = false
+	if is_instance_valid(name_label):
+		name_label.visible = false
 
 func respawn_at(pos: Vector3) -> void:
 	if not is_multiplayer_authority():
@@ -237,16 +247,14 @@ func respawn_at(pos: Vector3) -> void:
 
 @rpc("authority", "reliable", "call_local")
 func _show_respawn() -> void:
-	# Local player keeps body hidden (1st person); others get to see it again.
+	# Local player still hides own body (1st person); others see model again.
 	if not is_multiplayer_authority():
-		body_mesh.visible = true
-		head_mesh.visible = true
-	name_label.visible = not is_multiplayer_authority()
+		model_holder.visible = true
+		name_label.visible = true
 
 func _run_invincibility() -> void:
 	is_invincible = true
 	var elapsed := 0.0
-	# Blink cycle for non-local viewers — local player can't see their own body.
 	while elapsed < RESPAWN_INVINCIBILITY:
 		_blink_visibility.rpc(int(elapsed * 8) % 2 == 0)
 		await get_tree().create_timer(0.12).timeout
@@ -259,6 +267,5 @@ func _run_invincibility() -> void:
 @rpc("authority", "unreliable", "call_local")
 func _blink_visibility(visible_on: bool) -> void:
 	if is_multiplayer_authority():
-		return  # Local player's body always hidden anyway.
-	body_mesh.visible = visible_on
-	head_mesh.visible = visible_on
+		return
+	model_holder.visible = visible_on
