@@ -25,6 +25,11 @@
 | ~20 min | `e85638d` | v6.4 第一轮自动调优（见下） |
 | ~35 min | `709333e` | v6.4.1 修 server.json 加载死锁（HOTFIX） |
 | ~40 min | `1a8f384` | v6.4.1 重编 pck（之前的 export 用了 .godot/exported/ 旧 .gdc 缓存导致改动没真的进 pck） |
+| ~50 min | `805e245` | v6.4.2 加诊断 probe 验证 pipeline |
+| ~55 min | `7e464f3` | v6.4.3 改 JS 轮询用字符串 sentinel |
+| ~60 min | `d569ebb` | v6.4.4 加 `console.log` 诊断（追踪 JS eval 实际行为） |
+| ~75 min | `9545381` | **v6.5 大改：把生产 wss URL 写死进 default**，server.json 降为软覆盖 |
+| ~80 min | `e0ee00f` | v6.5.1 加 cache-bust shim（每个新 build 强制重拉 pck/wasm/js）|
 
 ---
 
@@ -74,6 +79,20 @@
 - **代理 A 关于 move_toward 'slidey' 的判断**（实际读代码 deceleration 已是瞬时，agent 误判）
 - **代理 A 关于 fire-rate 'sluggish' 的判断**（120ms cadence 是设计选择）
 - **代理 A 关于 first-person arm 可见**（model_holder 在 `_setup_authority_visuals` 已 hide，无 bug）
+
+---
+
+## 第 2 轮：server.json fetch 死锁 + 浏览器缓存
+
+**起因**：Chrome MCP smoke test 发现 v6.2 的 "Join 按钮等 server.json 加载完才解锁" 是个回归 —— Godot 4.6 web 单线程 build 的 `HTTPRequest.request_completed` 信号根本不触发，所以 Join 永远是禁用的。朋友点不开。
+
+**绕过 1（v6.4.1-v6.4.4）**：用 `JavaScriptBridge.eval` 调浏览器原生 `fetch`，写到 `window.__sj_url`，GDScript 轮询。结论是 fetch 本身能用，但 GDScript `await` 协程很可能因为 `_ready` 没 await 它而被 GC，所以读不到。
+
+**最终方案（v6.5）**：直接放弃这条路，把生产 URL **写死** 进 `NetworkManager.default_server_url := "wss://game.boobank.com"`。server.json 退化为"如果加载成功就软覆盖"，Join 按钮**永远立刻可用**。如果将来换隧道，改这个常量重新编一次就行。
+
+**额外收获（v6.5.1）**：发现一个潜在的用户痛点 —— **Godot Web 重新部署后，回访的浏览器还会用缓存的旧 pck**。写了 `scripts/post_export.sh`，自动给 `index.html` 注入一个 fetch 拦截器，把 `?v=<pck-hash>` 加到所有 `.pck/.wasm/.js` URL 上。现在新 build = 新 hash = 新 URL = 必定 cache miss。**这个修复对朋友升级体验帮助巨大**，以前你 push 了新版本他们要手动 hard-refresh，现在自动生效。
+
+✅ 已经在 Chrome MCP 里端到端验证：fresh tab 加载 → 日志 `[main_menu] fetching server.json (via JS, soft override)` → JS fetch 拿到 `wss://game.boobank.com` → Join 按钮可用。
 
 ---
 
