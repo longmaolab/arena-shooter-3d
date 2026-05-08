@@ -15,7 +15,6 @@ const SKIN_COUNT := 18
 @onready var lb_empty: Label = $Center/Cols/LeaderboardPanel/LBox/LBEmpty
 
 func _ready() -> void:
-	print("[probe] main_menu build=v641c-cachefix")  # autonomous-rebuild verification
 	if "--server" in OS.get_cmdline_user_args():
 		print("[main_menu] --server flag detected, starting dedicated server")
 		NetworkManager.start_dedicated_server()
@@ -41,12 +40,11 @@ func _ready() -> void:
 	if OS.has_feature("web"):
 		host_btn.disabled = true
 		host_btn.text = "Host (desktop only)"
-		# Block Join until server.json finishes loading; otherwise a fast tap
-		# would dial the localhost default that's only valid in dev.
-		join_btn.disabled = true
-		ip_input.text = ""
-		ip_input.placeholder_text = "Loading server URL..."
-		status.text = "Loading server URL..."
+		# Default URL is now baked in (NetworkManager.default_server_url),
+		# so Join is always usable. We still try to fetch server.json as a
+		# soft override, but a failure no longer blocks gameplay.
+		ip_input.text = NetworkManager.default_server_url
+		status.text = "Press Join to connect"
 		_load_default_server_url()
 	else:
 		status.text = "Pick Host or Join"
@@ -102,36 +100,26 @@ func _load_default_server_url() -> void:
 		_load_via_http_request()
 
 func _load_via_js_fetch() -> void:
-	print("[main_menu] fetching server.json (via JS)")
-	# Diagnostic 1: can eval write a string? (round-trip)
-	JavaScriptBridge.eval("window.__diag = 'hello-from-eval'", true)
-	var d1: Variant = JavaScriptBridge.eval("window.__diag", true)
-	print("[diag] eval write/read result: type=%s val='%s'" % [typeof(d1), String(d1) if d1 != null else "<null>"])
-	# Diagnostic 2: trigger a console.log so we know the JS code runs
-	JavaScriptBridge.eval("console.log('[js eval] diag console.log fired')", true)
-	# Now the actual fetch
+	# Soft override: try to fetch server.json via the browser's native
+	# fetch (HTTPRequest's request_completed proved unreliable in 4.6 web
+	# single-threaded builds). If anything fails, we keep the baked-in
+	# default URL. No UI gate — Join works regardless.
+	print("[main_menu] fetching server.json (via JS, soft override)")
 	JavaScriptBridge.eval("""
 		window.__sj_status = 'pending';
 		window.__sj_url = '';
-		(function() {
-			var u = location.origin + location.pathname.replace(/[^/]*$/, '') + 'server.json';
-			console.log('[js fetch] starting', u);
-			fetch(u, {cache: 'no-cache'})
-				.then(function(r){ console.log('[js fetch] got response', r.status); if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
-				.then(function(j){
-					window.__sj_url = (j && j.url) ? String(j.url) : '';
-					window.__sj_status = 'done';
-					console.log('[js fetch] resolved:', window.__sj_url);
-				})
-				.catch(function(e){
-					window.__sj_status = 'error';
-					console.log('[js fetch] rejected:', String(e));
-				});
-		})();
+		var u = location.origin + location.pathname.replace(/[^/]*$/, '') + 'server.json';
+		fetch(u, {cache: 'no-cache'})
+			.then(function(r){ if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+			.then(function(j){
+				window.__sj_url = (j && j.url) ? String(j.url) : '';
+				window.__sj_status = 'done';
+			})
+			.catch(function(_){ window.__sj_status = 'error'; });
 	""", true)
 	var elapsed := 0.0
-	var tick := 0.15
-	var deadline := 6.0
+	var tick := 0.2
+	var deadline := 4.0
 	while elapsed < deadline:
 		await get_tree().create_timer(tick).timeout
 		elapsed += tick
@@ -141,12 +129,8 @@ func _load_via_js_fetch() -> void:
 			continue
 		var url_v: Variant = JavaScriptBridge.eval("String(window.__sj_url||'')", true)
 		var url_s := String(url_v) if url_v != null else ""
-		print("[main_menu] server.json status=%s url='%s'" % [status_s, url_s])
 		_apply_server_url(url_s)
 		return
-	# Pre-timeout poke so we can see what status got stuck at
-	var final_status: Variant = JavaScriptBridge.eval("String(window.__sj_status||'<undef>')", true)
-	print("[main_menu] server.json timed out, final status='%s'" % String(final_status))
 	_apply_server_url("")
 
 func _load_via_http_request() -> void:
@@ -172,21 +156,19 @@ func _on_server_json_loaded(_result: int, response_code: int, _headers: PackedSt
 	_apply_server_url(url)
 
 func _apply_server_url(url: String) -> void:
+	# Soft override: replace the baked-in default if server.json provided
+	# a URL. If fetch failed or returned empty, the baked default stays.
 	if url == "":
-		ip_input.placeholder_text = "Enter server URL (e.g. wss://...)"
-		status.text = "Server URL unavailable — paste manually"
-		if not ip_input.text_changed.is_connected(_on_manual_ip_changed):
-			ip_input.text_changed.connect(_on_manual_ip_changed)
+		print("[main_menu] server.json unavailable, keeping baked default")
 		return
-	print("[main_menu] loaded server URL: ", url)
+	print("[main_menu] server.json override: ", url)
 	NetworkManager.default_server_url = url
 	if is_instance_valid(ip_input):
 		ip_input.text = url
-	join_btn.disabled = false
-	status.text = "Press Join to connect"
 
-func _on_manual_ip_changed(new_text: String) -> void:
-	join_btn.disabled = new_text.strip_edges() == ""
+# Kept for completeness (unused after server.json became soft).
+func _on_manual_ip_changed(_new_text: String) -> void:
+	pass
 
 func _on_host() -> void:
 	NetworkManager.save_settings()
