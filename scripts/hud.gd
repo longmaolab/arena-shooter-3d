@@ -24,6 +24,7 @@ var _vignette_alpha: float = 0.0
 var _countdown_left: float = 0.0
 var _show_countdown_text: bool = false
 var _kill_banner_timer: float = 0.0
+var _hit_marker_tween: Tween = null
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -70,12 +71,17 @@ func _on_local_player_spawned(p: Node) -> void:
 	_on_ammo(p.ammo)
 
 func _on_hit_marker() -> void:
+	# Burst hits within <140ms used to spawn overlapping tweens fighting over
+	# the same scale/alpha — kill the prior tween so each new hit restarts
+	# clean.
+	if _hit_marker_tween and _hit_marker_tween.is_valid():
+		_hit_marker_tween.kill()
 	hit_marker.modulate.a = 1.0
 	hit_marker.scale = Vector2(1.5, 1.5)
 	hit_marker.pivot_offset = hit_marker.size * 0.5
-	var tw := create_tween()
-	tw.tween_property(hit_marker, "scale", Vector2.ONE, 0.06)
-	tw.parallel().tween_property(hit_marker, "modulate:a", 0.0, 0.14)
+	_hit_marker_tween = create_tween()
+	_hit_marker_tween.tween_property(hit_marker, "scale", Vector2.ONE, 0.06)
+	_hit_marker_tween.parallel().tween_property(hit_marker, "modulate:a", 0.0, 0.14)
 
 func _on_health(h: int) -> void:
 	hp_label.text = "HP: %d" % max(0, h)
