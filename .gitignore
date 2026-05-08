@@ -1,0 +1,29 @@
+# Godot 4 + GitHub Pages
+
+# Godot editor cache (regenerated on open, ~50MB)
+.godot/
+.import/
+
+# Imported translations (auto-generated)
+*.translation
+
+# Mono / C# (we don't use these but include for safety)
+.mono/
+data_*/
+mono_crash.*.json
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Editor backups
+*.swp
+*~
+*.bak
+
+# Don't commit secrets
+.env
+.env.local
+
+# DO commit: docs/  (the published web build for GitHub Pages)
+# DO commit: export_presets.cfg  (export settings)
