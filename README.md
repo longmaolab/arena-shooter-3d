@@ -3,6 +3,7 @@
 第一人称多人对战 FPS。Godot 4.6 + WebSocket + 18 个 Kenney 方块小人。**浏览器、手机都能玩**。
 
 🎮 **现场玩**（需要 host 在线）：https://longmaolab.github.io/arena-shooter-3d/
+🌐 **服务器域名**：`wss://game.boobank.com`（Cloudflare 命名隧道，固定不变）
 
 ## 怎么玩
 
@@ -25,21 +26,23 @@ arena-shooter-3d/
 ├── deploy.sh               一键推送 docs/ 到 GitHub Pages
 ├── docs/                   Web 客户端构建产物（GitHub Pages）
 │   ├── index.html / .wasm / .pck …
-│   └── server.json         ← 当前线上服务器 URL（每次开服更新）
+│   └── server.json         ← 服务器 URL（已固定为 wss://game.boobank.com）
+├── audio/                  音效（射击 / 命中 / 死亡 / 复活，CC0 Kenney）
 ├── models/characters/      Kenney 方块角色（18 个 GLB + 18 张贴图 + 缩略图）
 ├── scenes/
 │   ├── main_menu.tscn      主菜单 + 选角色界面
 │   ├── game.tscn           竞技场地图
 │   ├── player.tscn         联网玩家
-│   ├── hud.tscn            HUD + 计分板 + 死亡黑屏
+│   ├── hud.tscn            HUD + 计分板 + 死亡黑屏 + 击杀提示
 │   └── touch_controls.tscn 手机虚拟摇杆
 └── scripts/
     ├── input_setup.gd      autoload：键盘映射
     ├── network_manager.gd  autoload：联网状态 / 房间列表 / 玩家信息
+    ├── stats_store.gd      autoload：本地持久化排行榜
     ├── main_menu.gd        主菜单 + 选角色 + server.json 自动加载
     ├── game.gd             场景调度 / 计分 / 新开局 / dedicated 模式
-    ├── player.gd           玩家移动 / 射击 / 受伤反馈 / 换肤
-    ├── hud.gd              HP / 弹药 / 计分榜 / 死亡红屏
+    ├── player.gd           玩家移动 / 射击 / 动画 / 音效 / 换肤
+    ├── hud.gd              HP / 弹药 / 计分榜 / 击杀提示 / 死亡红屏
     └── touch_controls.gd   虚拟摇杆 + 滑动看 + 三按钮
 ```
 
@@ -60,74 +63,53 @@ arena-shooter-3d/
 总览：
 
 ```
-[你 Mac]                                   [同学手机/电脑]
-─────────────                              ─────────────
-1. ./run_server.sh        ←── wss:// ──→  浏览器打开:
-   (Godot 无头服务器)                       longmaolab.github.io/arena-shooter-3d/
-2. cloudflared tunnel
-   (公网代理)
+[你 Mac]                                              [同学手机/电脑]
+─────────────                                         ─────────────
+1. ./run_server.sh                                    浏览器打开:
+   (Godot 无头服务器, :7777)        ←── wss:// ──→   longmaolab.github.io/arena-shooter-3d/
+2. cloudflared tunnel run arena-shooter               (server.json 已硬编码 wss://game.boobank.com)
+   (公网代理 → game.boobank.com)
 ```
 
-### 第一次准备（10 分钟，只做一次）
+### 第一次准备（一次性，已完成无需重做）
 
-```bash
-# 装 cloudflared（公网代理工具）
-brew install cloudflared
+域名 `boobank.com` 在 GoDaddy 注册，DNS 已托管 Cloudflare,命名隧道 `arena-shooter` 已创建,
+子域名 `game.boobank.com` 已 CNAME 到隧道。配置文件:
 
-# 注册 GitHub 仓库（如果还没）
-gh repo create longmaolab/arena-shooter-3d --public --source=. --remote=origin --push
+- `~/.cloudflared/config.yml` —— ingress 指向 `http://localhost:7777`
+- `~/.cloudflared/<UUID>.json` —— 隧道凭证(勿提交)
+- `docs/server.json` —— 已硬编码 `wss://game.boobank.com`,无需每次更新
 
-# 启用 GitHub Pages 指向 docs/
-gh api -X POST /repos/longmaolab/arena-shooter-3d/pages \
-  -f "source[branch]=main" -f "source[path]=/docs"
-```
+> 详细搭建步骤(全新机器或换域名时参考):见 [SERVER_GUIDE.md](SERVER_GUIDE.md)。
 
-### 每次开战流程（5 分钟）
+### 每次开战流程(2 个终端,30 秒搞定)
 
-#### 终端 1：启动游戏服务器
+#### 终端 1:启动游戏服务器
 ```bash
 cd /Users/longmao/projects/arena-shooter-3d
 ./run_server.sh
 ```
 看到 `[server] listening on port 7777` 即成功。**保持终端别关**。
 
-> ✨ 脚本会自动检测并清理上次没退出干净的服务器进程，**不用再手动 pkill**。
+> ✨ 脚本会自动清理上次没退出干净的服务器进程,**不用手动 pkill**。
 
-#### 终端 2：开 Cloudflare Tunnel
+#### 终端 2:启动 Cloudflare 命名隧道
 ```bash
-cloudflared tunnel --url http://localhost:7777
+cloudflared tunnel run arena-shooter
 ```
+看到 `Registered tunnel connection` 即成功。**保持终端别关**。
 
-输出里会有一行：
-```
-https://abc-def-xyz.trycloudflare.com
-```
-**复制这个 URL**。**保持终端别关**。
-
-#### 终端 3：把 URL 写进 server.json 并推送
-```bash
-cd /Users/longmao/projects/arena-shooter-3d
-
-# ⚠️ 把 abc-def-xyz 换成你刚才得到的真实 URL，注意 https → wss
-cat > docs/server.json <<'EOF'
-{"url": "wss://abc-def-xyz.trycloudflare.com"}
-EOF
-
-git add docs/server.json
-git commit -m "Update live server URL"
-git push
-```
-
-约 1 分钟后，发链接给同学：
+发链接给同学:
 ```
 https://longmaolab.github.io/arena-shooter-3d/
 ```
-
-同学在浏览器打开 → 选角色 → 点 **Join**（地址已自动加载）→ 联机！
+同学打开 → 选角色 → 点 **Join**(地址已自动加载 `wss://game.boobank.com`)→ 联机!
 
 #### 玩完关服务器
-- 终端 1 按 **Ctrl+C**
-- 终端 2 按 **Ctrl+C**
+- 两个终端各按一次 **Ctrl+C**,或:
+  ```bash
+  pkill -f "Godot.*--server" && pkill -x cloudflared
+  ```
 
 ---
 
@@ -160,13 +142,14 @@ https://longmaolab.github.io/arena-shooter-3d/
 
 ## 进阶 / TODO
 
-- [ ] 角色走路 / 待机动画
+- [x] ~~角色走路 / 待机动画~~（v6）
+- [x] ~~死亡音效 + 击杀提示~~（v6）
+- [x] ~~排行榜 + 持久化数据~~（v6,本地存档）
+- [x] ~~永久服务器 URL（Cloudflare 命名隧道）~~（`game.boobank.com`)
 - [ ] 武器切换（手枪 / 狙击 / 散弹）
 - [ ] 多房间系统（房间码加入）
-- [ ] 永久服务器 URL（Cloudflare 命名隧道，需要域名）
-- [ ] 死亡音效 + 击杀提示
-- [ ] 24h 在线服务器（Fly.io / Hetzner VPS，需要每月几块钱）
-- [ ] 排行榜 + 持久化数据
+- [ ] 24h 在线服务器（Fly.io / Hetzner VPS,需要每月几块钱）—— 现在主机离线就停服
+- [ ] 把隧道 + Godot 服务器都装成 macOS launchd 服务,开机自启
 
 ## 致谢
 
