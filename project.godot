@@ -24,6 +24,14 @@ InputSetup="*res://scripts/input_setup.gd"
 NetworkManager="*res://scripts/network_manager.gd"
 StatsStore="*res://scripts/stats_store.gd"
 
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/handheld/orientation=0
+
 [rendering]
 
 anti_aliasing/quality/msaa_3d=2

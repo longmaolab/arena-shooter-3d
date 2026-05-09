@@ -18,15 +18,21 @@ const ACTIONS := {
 const LOOK_SENSITIVITY := 0.0030    # rad / px — half-screen swipe ≈ 60° pan
 const LOOK_DEAD_PX     := 1.2       # ignore sub-pixel jitter from finger rest
 const JOY_DEADZONE     := 0.12      # ignore the first 12% of stick travel
+# Tap-to-fire on the right look zone — single-thumb mouse-like feel: drag
+# to aim, lift quickly to fire one shot. Two-finger users still hit FIRE.
+const TAP_FIRE_MAX_DRAG := 18.0     # px — over this, treated purely as look
+const TAP_FIRE_MAX_TIME := 0.28     # s  — over this, treated as held aim
+const TAP_FIRE_PULSE    := 0.09     # s  — keep "shoot" pressed long enough
+                                    #       for any weapon's cooldown gate
 
 # ─── Sizing — scales with viewport so high-DPI phones get proper big buttons ─
-const JOY_RADIUS_MIN   := 130.0
-const JOY_RADIUS_RATIO := 0.20      # 20% of viewport height
+const JOY_RADIUS_MIN   := 110.0
+const JOY_RADIUS_RATIO := 0.17      # 17% of viewport height (down from 20)
 const BTN_SIZE_MIN     := 120.0
 const BTN_SIZE_RATIO   := 0.16
 const BTN_MARGIN       := 26.0
 const BTN_GAP          := 22.0
-const MOVE_ZONE_X      := 0.45      # left fraction of screen reserved for joystick
+const MOVE_ZONE_X      := 0.36      # left fraction of screen reserved for joystick
 
 # ─── Internal state ─────────────────────────────────────────────────
 var _joy_radius := JOY_RADIUS_MIN
@@ -39,6 +45,9 @@ var _move_active   := false
 
 var _look_touch_id := -1
 var _look_last     := Vector2.ZERO
+var _look_start    := Vector2.ZERO
+var _look_t0       := 0.0
+var _look_dragged  := false
 
 var _shoot_touch_id  := -1
 var _jump_touch_id   := -1
@@ -131,6 +140,9 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 		else:
 			_look_touch_id = event.index
 			_look_last = event.position
+			_look_start = event.position
+			_look_t0 = Time.get_ticks_msec() * 0.001
+			_look_dragged = false
 	else:
 		if event.index == _shoot_touch_id:
 			_shoot_touch_id = -1
@@ -150,6 +162,13 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 			_set_move_vector(Vector2.ZERO)
 			queue_redraw()
 		elif event.index == _look_touch_id:
+			# Lift on the look zone with no significant drag and a short
+			# hold = "tap to fire" — feels like a mouse click with the
+			# same hand that aims.
+			var dt: float = Time.get_ticks_msec() * 0.001 - _look_t0
+			var moved: float = (event.position - _look_start).length()
+			if not _look_dragged and dt < TAP_FIRE_MAX_TIME and moved < TAP_FIRE_MAX_DRAG:
+				_pulse_fire()
 			_look_touch_id = -1
 		else:
 			for i in _weapon_touch_ids.size():
@@ -206,9 +225,20 @@ func _handle_drag(event: InputEventScreenDrag) -> void:
 		if delta.length() < LOOK_DEAD_PX:
 			return
 		_look_last = event.position
+		# Once total movement crosses the tap-fire threshold, lock this
+		# touch into "drag aim" mode so releasing won't fire a stray shot.
+		if not _look_dragged and (event.position - _look_start).length() > TAP_FIRE_MAX_DRAG:
+			_look_dragged = true
 		var p := get_tree().get_first_node_in_group("local_player")
 		if p and p.has_method("apply_touch_look"):
 			p.apply_touch_look(delta * LOOK_SENSITIVITY)
+
+func _pulse_fire() -> void:
+	# Press shoot, then release after one weapon's cooldown gate so a single
+	# tap fires exactly one shot regardless of weapon (pistol / SMG / shotgun).
+	Input.action_press(ACTIONS["shoot"])
+	await get_tree().create_timer(TAP_FIRE_PULSE).timeout
+	Input.action_release(ACTIONS["shoot"])
 
 func _set_move_vector(v: Vector2) -> void:
 	_set_action(ACTIONS["right"],   max(0.0, v.x))

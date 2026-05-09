@@ -27,6 +27,9 @@ func _ready() -> void:
 
 	NetworkManager.load_settings()
 
+	_apply_mobile_ui_scale()
+	get_viewport().size_changed.connect(_apply_mobile_ui_scale)
+
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	host_btn.pressed.connect(_on_host)
 	join_btn.pressed.connect(_on_join)
@@ -56,6 +59,28 @@ func _ready() -> void:
 		_load_default_server_url()
 	else:
 		status.text = "PLAY = join LAN    PLAY vs BOTS = single-player"
+
+func _apply_mobile_ui_scale() -> void:
+	# On phones / small browser canvases the 1280x720 design resolution
+	# renders ~0.6x scale, which makes labels unreadable. Bump the window's
+	# content_scale_factor so the menu reads like a phone-native UI without
+	# us having to re-author every font size for two form factors.
+	var win := get_window()
+	if win == null:
+		return
+	var size := get_viewport().get_visible_rect().size
+	# Pick a scale that targets roughly 720 logical px tall, regardless of
+	# physical viewport. Capped so desktop doesn't get gigantic chrome.
+	var s: float = clamp(720.0 / max(size.y, 1.0), 1.0, 1.8)
+	# Touch devices need a small extra bump — fingers need bigger hit
+	# targets than a mouse cursor.
+	var is_touch := DisplayServer.is_touchscreen_available() \
+		or OS.has_feature("mobile") \
+		or OS.has_feature("web_android") \
+		or OS.has_feature("web_ios")
+	if is_touch:
+		s = clamp(s * 1.15, 1.0, 1.85)
+	win.content_scale_factor = s
 
 func _on_name_changed(new_text: String) -> void:
 	NetworkManager.local_player_name = new_text.strip_edges()
