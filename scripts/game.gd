@@ -9,6 +9,7 @@ const PLAYER_SCENE := preload("res://scenes/player.tscn")
 # Server-authoritative combat constants. Damage is NOT trusted from clients.
 const SERVER_MAX_HEALTH := 100
 const SERVER_BULLET_DAMAGE := 25
+const SERVER_HEADSHOT_DAMAGE := 50
 const SERVER_RESPAWN_INVINCIBILITY := 1.5
 
 @onready var spawn_points: Node3D = $SpawnPoints
@@ -95,8 +96,10 @@ func _remote_despawn(peer_id: int) -> void:
 # ─── Combat resolution (server authoritative) ───────────────────────
 
 @rpc("any_peer", "reliable", "call_local")
-func server_report_hit(victim_peer_id: int) -> void:
-	# Server-authoritative: damage is NOT taken from the client.
+func server_report_hit(victim_peer_id: int, is_headshot: bool, hit_pos: Vector3) -> void:
+	# Server-authoritative: damage is NOT taken from the client. The headshot
+	# claim is just a hint — server re-validates the impact Y is within the
+	# victim's actual head region before granting the bonus damage.
 	if not NetworkManager.is_server() or game_over:
 		return
 	var attacker_peer_id := multiplayer.get_remote_sender_id()
@@ -118,15 +121,43 @@ func server_report_hit(victim_peer_id: int) -> void:
 	# Sanity check: attacker must be alive to land hits.
 	if int(attacker_info.get("health", SERVER_MAX_HEALTH)) <= 0:
 		return
-	var new_health: int = max(0, current_health - SERVER_BULLET_DAMAGE)
-	victim_info["health"] = new_health
+	# Validate the headshot claim against the server's view of the victim.
 	var victim_node := get_player_node(victim_peer_id)
-	# get_player_node may return a node that's already queue_free'd this frame.
+	var validated_headshot := false
+	if is_headshot and victim_node and is_instance_valid(victim_node):
+		var dy: float = hit_pos.y - victim_node.global_position.y
+		validated_headshot = dy > 1.0 and dy < 2.5
+	var damage: int = SERVER_HEADSHOT_DAMAGE if validated_headshot else SERVER_BULLET_DAMAGE
+	var new_health: int = max(0, current_health - damage)
+	victim_info["health"] = new_health
 	if victim_node and is_instance_valid(victim_node) and not victim_node.is_queued_for_deletion():
 		victim_node.take_damage_remote.rpc_id(
-			victim_peer_id, new_health, SERVER_BULLET_DAMAGE, attacker_peer_id)
+			victim_peer_id, new_health, damage, attacker_peer_id)
+	# Floating damage number visible to everyone (the shooter cares most, but
+	# bystanders can see when their teammate is being chunked).
+	spawn_damage_number.rpc(hit_pos, damage, validated_headshot)
 	if new_health <= 0:
 		_handle_kill(attacker_peer_id, victim_peer_id)
+
+@rpc("authority", "unreliable", "call_local")
+func spawn_damage_number(pos: Vector3, damage: int, is_headshot: bool) -> void:
+	var label := Label3D.new()
+	label.text = ("HEAD! -%d" % damage) if is_headshot else ("-%d" % damage)
+	label.font_size = 64 if is_headshot else 48
+	label.outline_size = 8
+	label.modulate = Color(1, 0.30, 0.30) if is_headshot else Color(1, 0.92, 0.40)
+	label.outline_modulate = Color.BLACK
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.no_depth_test = true
+	label.fixed_size = true
+	label.pixel_size = 0.0028
+	get_tree().current_scene.add_child(label)
+	label.global_position = pos + Vector3(0, 0.4, 0)
+	var rise_target: Vector3 = label.global_position + Vector3(randf_range(-0.3, 0.3), 1.4, 0)
+	var tw := label.create_tween()
+	tw.tween_property(label, "global_position", rise_target, 0.8)
+	tw.parallel().tween_property(label, "modulate:a", 0.0, 0.8)
+	tw.tween_callback(label.queue_free)
 
 func _handle_kill(attacker_peer_id: int, victim_peer_id: int) -> void:
 	# Called only from server_report_hit on the server. No client RPC entry.

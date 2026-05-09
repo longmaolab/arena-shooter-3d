@@ -248,8 +248,12 @@ func _try_shoot() -> void:
 		if victim and victim != self:
 			hit_player = true
 			var victim_peer_id: int = victim.get_multiplayer_authority()
-			# Server applies the actual damage from its own constant; we just report the hit.
-			_game.server_report_hit.rpc_id(NetworkManager.HOST_PEER_ID, victim_peer_id)
+			# Headshot if the impact landed in the upper third of the capsule
+			# (capsule center y = 0.85, total height 1.7, so y > origin + 1.4 ≈ head).
+			# Server still validates this claim before granting the bonus damage.
+			var is_headshot: bool = (end_pos.y - victim.global_position.y) > 1.4
+			_game.server_report_hit.rpc_id(
+				NetworkManager.HOST_PEER_ID, victim_peer_id, is_headshot, end_pos)
 	else:
 		end_pos = camera.global_position + (-camera.global_transform.basis.z) * 80.0
 	_fire_fx.rpc(start_pos, end_pos, hit_player)
