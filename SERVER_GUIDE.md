@@ -1,214 +1,257 @@
-# 服务器运维指南
+# 服务器架构与一次性搭建指南
 
-每次想跟同学联机时,按这套流程做。
-
-服务器地址固定为 **`wss://game.boobank.com`**(Cloudflare 命名隧道),所以
-开服流程比临时隧道时代简单很多 —— **不再需要每次推送 `server.json`**。
+日常运维命令速查见 [OPERATIONS.md](OPERATIONS.md)。
+本文档描述**当前架构**和**从零到上线的完整步骤**(用于换服务器或别的域名时复刻)。
 
 ---
 
-## 一次性准备(已完成,新机器才需要重做)
+## 当前架构总览
 
-### 1. 安装 Cloudflare Tunnel
+```
+玩家(浏览器/手机)
+   │
+   ▼  https://game.boobank.com/...
+[Cloudflare 边缘网络] (Tokyo / HK / 全球节点)
+   │
+   ▼  Cloudflare 命名隧道(QUIC,出向连接,无需开放服务器入向端口)
+[Vultr Tokyo Ubuntu 24.04 服务器] root@207.148.98.206
+   │
+   ├── cloudflared.service        ────► localhost:80
+   │
+   ├── caddy.service (端口 80)
+   │     ├── /                     ───► /opt/games/portal/(门户静态页)
+   │     ├── /arena-shooter/       ───► /opt/games/arena-shooter-3d/docs/(游戏静态页)
+   │     └── /arena-shooter/ws     ───► localhost:7777(反代到 Godot)
+   │
+   └── arena-game.service          ────► Godot --headless,监听 :7777
+                                          (WebSocketMultiplayerPeer)
+```
 
+**关键设计**:
+- **TLS 在 Cloudflare 边缘终止**,源站只跑 HTTP :80,**不需要管证书**
+- **入向 SSH 才开放** (UFW 22/tcp);所有玩家流量都走 cloudflared 出向连接
+- **Caddy 同一域名** 同时处理静态文件和 WebSocket(基于路径 / Upgrade 头)
+- **多游戏靠路径区分**(`/arena-shooter/`、`/{下个游戏}/`)
+- **代码 → 服务器** 全靠 git。服务器 = git 的运行时镜像,**任何东西都能从 git 重建**
+
+---
+
+## 一次性搭建步骤(新服务器或换厂商时按此走)
+
+### 0. 准备前提
+
+- 域名(本项目用 `boobank.com`)已托管到 Cloudflare DNS
+- 已在 Cloudflare 创建命名隧道 `arena-shooter` 并 `cloudflared tunnel route dns arena-shooter game.boobank.com`
+- Mac 上有 `~/.cloudflared/cert.pem` + `<UUID>.json`(隧道凭证)
+
+如果上述都没有,先在你 Mac 上做一遍:
 ```bash
 brew install cloudflared
-```
-
-### 2. 验证 Godot 路径
-
-`run_server.sh` 会自动在常见位置搜 `Godot.app`。确认其中之一存在:
-
-```bash
-ls /Applications/Godot.app/Contents/MacOS/Godot 2>/dev/null \
- || ls ~/Downloads/Godot.app/Contents/MacOS/Godot 2>/dev/null \
- || echo "把 Godot.app 放到 /Applications 或 ~/Downloads"
-```
-
-如果都不在,把 Godot.app 放过去,或用环境变量:
-```bash
-GODOT_BIN=/path/to/Godot.app/Contents/MacOS/Godot ./run_server.sh
-```
-
-### 3. 搭建 Cloudflare 命名隧道(第一次设置或换域名时)
-
-#### 3.1 域名 DNS 托管到 Cloudflare
-
-`boobank.com` 已经在 GoDaddy 注册,nameserver 已改为 Cloudflare:
-```
-arely.ns.cloudflare.com
-jarred.ns.cloudflare.com
-```
-
-换域名时,在 Cloudflare 仪表盘 **Add a site** → 拿到 NS → 去注册商把
-nameserver 改成 Cloudflare 给的两条。
-
-#### 3.2 登录并创建隧道
-
-```bash
-cloudflared tunnel login                       # 浏览器选择域名,生成 ~/.cloudflared/cert.pem
-cloudflared tunnel create arena-shooter        # 生成 ~/.cloudflared/<UUID>.json
+cloudflared tunnel login                               # 浏览器选 boobank.com
+cloudflared tunnel create arena-shooter                # 生成 UUID + JSON
 cloudflared tunnel route dns arena-shooter game.boobank.com
 ```
 
-最后一条会自动在 Cloudflare DNS 里加 CNAME(橙色云代理状态)。
+### 1. 开 VPS
 
-#### 3.3 写隧道配置
+任意 Linux VPS 都行,本项目用 **Vultr Tokyo Cloud Compute Shared CPU $12/mo**:
+- 2GB RAM / 1 vCPU / 55GB SSD / 2TB 流量
+- Ubuntu 24.04 LTS x64
+- 添加 SSH key
 
-`~/.cloudflared/config.yml`:
+### 2. SSH 进去 + 系统初始化
+
+```bash
+ssh root@<IP>
+
+apt-get update && apt-get upgrade -y
+apt-get install -y curl wget git unzip ufw htop tmux jq ca-certificates
+
+timedatectl set-timezone Asia/Shanghai
+hostnamectl set-hostname arena-game
+
+# 防火墙:只放 SSH。游戏流量走 cloudflared 出向连接,不需要入向端口。
+ufw default deny incoming
+ufw default allow outgoing
+ufw allow 22/tcp
+ufw --force enable
+```
+
+### 3. 装 cloudflared
+
+```bash
+mkdir -p --mode=0755 /usr/share/keyrings
+curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null
+echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared noble main' | tee /etc/apt/sources.list.d/cloudflared.list
+apt-get update && apt-get install -y cloudflared
+```
+
+### 4. 把 Mac 上的隧道凭证传到服务器
+
+**在 Mac 上**:
+```bash
+ssh root@<IP> 'mkdir -p /etc/cloudflared && chmod 700 /etc/cloudflared'
+scp ~/.cloudflared/cert.pem ~/.cloudflared/<UUID>.json root@<IP>:/etc/cloudflared/
+ssh root@<IP> 'chmod 600 /etc/cloudflared/*.json /etc/cloudflared/cert.pem'
+```
+
+**回服务器**,写 cloudflared 配置:
 ```yaml
+# /etc/cloudflared/config.yml
 tunnel: arena-shooter
-credentials-file: /Users/longmao/.cloudflared/<UUID>.json
+credentials-file: /etc/cloudflared/<UUID>.json
 
 ingress:
   - hostname: game.boobank.com
-    service: http://localhost:7777
+    service: http://localhost:80
   - service: http_status:404
 ```
 
-把 `<UUID>` 换成 `cloudflared tunnel create` 输出里的真实 ID。验证:
 ```bash
-cloudflared tunnel ingress validate            # 输出 OK
+cloudflared --config /etc/cloudflared/config.yml tunnel ingress validate   # 应输出 OK
 ```
 
-#### 3.4 `docs/server.json` 已硬编码
+### 5. 装 Godot 4.6.2 headless
 
-```json
-{ "url": "wss://game.boobank.com" }
+```bash
+cd /tmp
+wget https://github.com/godotengine/godot/releases/download/4.6.2-stable/Godot_v4.6.2-stable_linux.x86_64.zip
+unzip Godot_v4.6.2-stable_linux.x86_64.zip
+mv Godot_v4.6.2-stable_linux.x86_64 /usr/local/bin/godot
+chmod +x /usr/local/bin/godot
+godot --version    # 应输出 4.6.2.stable.official...
 ```
 
-以后**永远不用再改**(除非换域名)。
+### 6. clone 仓库
+
+```bash
+mkdir -p /opt/games
+git clone https://github.com/longmaolab/arena-shooter-3d.git /opt/games/arena-shooter-3d
+git clone https://github.com/longmaolab/portal.git /opt/games/portal
+cd /opt/games/arena-shooter-3d
+godot --headless --path . --import     # 生成 .import 文件(已在 git 里就跳过)
+```
+
+### 7. 装 Caddy
+
+```bash
+apt-get install -y debian-keyring debian-archive-keyring apt-transport-https
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' > /etc/apt/sources.list.d/caddy-stable.list
+apt-get update && apt-get install -y caddy
+```
+
+`/etc/caddy/Caddyfile`:
+```
+{
+	auto_https off
+	admin off
+}
+
+:80 {
+	# Arena Shooter 3D
+	handle /arena-shooter/ws {
+		reverse_proxy localhost:7777
+	}
+	handle_path /arena-shooter/* {
+		root * /opt/games/arena-shooter-3d/docs
+		file_server
+	}
+	handle /arena-shooter {
+		redir /arena-shooter/ permanent
+	}
+
+	# Portal (root)
+	handle {
+		root * /opt/games/portal
+		file_server
+	}
+}
+```
+
+```bash
+caddy validate --config /etc/caddy/Caddyfile     # 应输出 Valid configuration
+```
+
+### 8. systemd 单元
+
+`/etc/systemd/system/arena-game.service`:
+```ini
+[Unit]
+Description=Arena Shooter 3D Dedicated Game Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/games/arena-shooter-3d
+Environment=GODOT_BIN=/usr/local/bin/godot
+Environment=GODOT_SILENCE_ROOT_WARNING=1
+Environment=PORT=7777
+ExecStart=/opt/games/arena-shooter-3d/run_server.sh
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+```
+
+cloudflared 自带 systemd 单元生成命令:
+```bash
+cloudflared service install
+```
+
+### 9. 全部启动
+
+```bash
+systemctl daemon-reload
+systemctl enable --now arena-game caddy cloudflared
+sleep 4
+systemctl is-active arena-game caddy cloudflared       # 三个都应是 active
+```
+
+### 10. 验证
+
+```bash
+# 在你 Mac 上(或任何机器)
+curl -I https://game.boobank.com/                            # 200, 门户
+curl -I https://game.boobank.com/arena-shooter/              # 200, 游戏页
+curl -s https://game.boobank.com/arena-shooter/server.json   # {"url": "wss://..."}
+
+# WSS 握手(应回 101 Switching Protocols)
+python3 -c "
+import ssl, socket, base64, os
+ctx = ssl.create_default_context()
+sock = socket.create_connection(('game.boobank.com', 443), timeout=10)
+s = ctx.wrap_socket(sock, server_hostname='game.boobank.com')
+key = base64.b64encode(os.urandom(16)).decode()
+req = (
+    'GET /arena-shooter/ws HTTP/1.1\r\nHost: game.boobank.com\r\n'
+    'Upgrade: websocket\r\nConnection: Upgrade\r\n'
+    f'Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n'
+)
+s.sendall(req.encode())
+print(s.recv(2048).decode(errors='replace')[:200])
+"
+```
+
+打开浏览器 https://game.boobank.com/arena-shooter/ → 选角色 → Join → 上线!
 
 ---
 
-## 每次开战流程(2 个终端,30 秒)
+## 加新游戏到这套架构
 
-### 终端 1:启动游戏服务器
+参考 [OPERATIONS.md](OPERATIONS.md) 的"加新游戏"一节。简单说就是:
 
-```bash
-cd /Users/longmao/projects/arena-shooter-3d
-./run_server.sh
-```
-
-应该看到:
-```
-→ Starting headless game server on port 7777...
-[server] listening on port 7777
-```
-
-⚠️ 终端**别关**。脚本会自动清理上次没退干净的进程。
-
-### 终端 2:启动命名隧道
-
-```bash
-cloudflared tunnel run arena-shooter
-```
-
-看到 `Registered tunnel connection` 就连上 Cloudflare 了。⚠️ 终端**别关**。
-
-### 把链接发给同学
-
-```
-https://longmaolab.github.io/arena-shooter-3d/
-```
-
-同学打开 → 选角色 → **Join**(地址已自动加载 `wss://game.boobank.com`)→ 联机!
+1. 仓库 clone 到 `/opt/games/<game>/`
+2. Caddy 加 `handle_path /<game>/*` 一段
+3. 联机的话再加 `handle /<game>/ws { reverse_proxy localhost:<端口> }` 和对应的 systemd 单元
 
 ---
 
-## 关服务器
+## 故障排查
 
-两个终端各按一次 **Ctrl+C**,或一行命令:
-
-```bash
-pkill -f "Godot.*--server" && pkill -x cloudflared
-```
-
-下次开服重新跑两个终端即可,**URL 永远不变,不需要 push 任何东西**。
-
----
-
-## 进阶:装成 launchd 服务,开机自启
-
-不想每次手动开终端,可以装成系统服务。
-
-### cloudflared 装成服务
-
-```bash
-sudo cloudflared service install
-```
-
-macOS 下会注册为 launchd 服务,开机自启。管理:
-```bash
-sudo launchctl list | grep cloudflared        # 查看
-sudo cloudflared service uninstall            # 卸载
-```
-
-### Godot 服务器装成 launchd(可选)
-
-写一个 plist `~/Library/LaunchAgents/com.longmao.arena-server.plist`:
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
-  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key><string>com.longmao.arena-server</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/Users/longmao/projects/arena-shooter-3d/run_server.sh</string>
-  </array>
-  <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><true/>
-  <key>StandardOutPath</key><string>/tmp/arena-server.log</string>
-  <key>StandardErrorPath</key><string>/tmp/arena-server.err</string>
-</dict>
-</plist>
-```
-
-加载:
-```bash
-launchctl load ~/Library/LaunchAgents/com.longmao.arena-server.plist
-```
-
-卸载:
-```bash
-launchctl unload ~/Library/LaunchAgents/com.longmao.arena-server.plist
-```
-
----
-
-## 常见问题
-
-### 同学打开链接看到 "Connection failed"
-- 你的服务器(终端 1)跑着吗?`lsof -iTCP:7777 -sTCP:LISTEN` 应有 Godot
-- 隧道(终端 2)跑着吗?日志最后应有 `Registered tunnel connection`
-- 在浏览器打开 `https://game.boobank.com/` —— 502 = 后端没起来,1033 = 隧道没连上
-- 浏览器 F12 → Console,截图发我
-
-### 浏览器报 502
-- 后端 `localhost:7777` 没起来,先启动 `./run_server.sh`
-- 或 `~/.cloudflared/config.yml` 里的端口 / hostname 写错了,跑 `cloudflared tunnel ingress validate`
-
-### 浏览器报 1033 / Tunnel not found
-- 隧道没运行,跑 `cloudflared tunnel run arena-shooter`
-- 或 DNS 没生效,`dig game.boobank.com +short` 应返回 Cloudflare IP
-
-### 同学打开页面是旧版
-- GitHub Pages 缓存,让同学**强制刷新**(电脑 Cmd/Ctrl+Shift+R;手机长按刷新键 → 不缓存重载)
-- 或加查询参数:`https://longmaolab.github.io/arena-shooter-3d/?v=2`
-
-### Godot 服务器报音频文件 "no resource loaders"
-新加 `audio/` 资源后第一次跑 headless 会出现。在 Godot 编辑器里打开一次项目,
-或命令行跑一次 import:
-```bash
-cd /Users/longmao/projects/arena-shooter-3d
-/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --import
-```
-生成的 `audio/*.import` 记得 commit。
-
-### 隧道偶尔断流
-- 命名隧道默认 4 条 HA 连接(Mac 实测会降到 2 条),个别断了不影响
-- 看终端 2 日志有没有 `Lost connection`,通常会自动重连
-- 长期断流换网络环境(比如换 WiFi)
+见 [OPERATIONS.md](OPERATIONS.md) 的"常见故障排查"章节。
