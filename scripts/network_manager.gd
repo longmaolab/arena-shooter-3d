@@ -102,7 +102,10 @@ func start_dedicated_server() -> int:
 		push_error("Dedicated server failed to start: %s" % err)
 		return err
 	print("[server] listening on port %d" % PORT)
-	get_tree().change_scene_to_file(GAME_SCENE)
+	# Deferred so we don't fight whoever's still setting up children when
+	# main_menu calls us inside its own _ready (Godot 4.6 throws "Parent
+	# node is busy adding/removing children" otherwise).
+	get_tree().change_scene_to_file.call_deferred(GAME_SCENE)
 	return OK
 
 func _create_server() -> int:
