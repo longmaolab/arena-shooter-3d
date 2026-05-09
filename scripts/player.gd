@@ -363,6 +363,38 @@ func take_damage_remote(new_health: int, amount: int, attacker_peer_id: int) -> 
 		_show_death.rpc()
 		local_died.emit()
 
+@rpc("any_peer", "reliable", "call_local")
+func notify_health_restored(new_health: int) -> void:
+	# Server pushes a heal (e.g. health pickup). Same sender-check pattern as
+	# take_damage_remote — only the host may legitimately move our HP up.
+	if not is_multiplayer_authority():
+		return
+	var sender: int = multiplayer.get_remote_sender_id()
+	if sender == 0:
+		if not NetworkManager.is_server():
+			return
+	elif sender != NetworkManager.HOST_PEER_ID:
+		return
+	health = new_health
+	local_health_changed.emit(health)
+	audio_2d.stream = SFX_RESPAWN
+	audio_2d.play()
+
+@rpc("any_peer", "reliable", "call_local")
+func notify_ammo_restored() -> void:
+	if not is_multiplayer_authority():
+		return
+	var sender: int = multiplayer.get_remote_sender_id()
+	if sender == 0:
+		if not NetworkManager.is_server():
+			return
+	elif sender != NetworkManager.HOST_PEER_ID:
+		return
+	ammo = MAX_AMMO
+	local_ammo_changed.emit(ammo)
+	audio_2d.stream = SFX_RESPAWN
+	audio_2d.play()
+
 @rpc("any_peer", "unreliable", "call_local")
 func _play_hit_sfx() -> void:
 	audio_3d.stream = SFX_HIT
