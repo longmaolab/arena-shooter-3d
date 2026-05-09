@@ -38,9 +38,9 @@ func _save_server_stats() -> void:
 	if f:
 		f.store_string(JSON.stringify(stats, "  "))
 
-func _ensure_player(name: String) -> void:
-	if not stats.has(name):
-		stats[name] = {"kills": 0, "deaths": 0, "wins": 0, "games": 0}
+func _ensure_player(player_name: String) -> void:
+	if not stats.has(player_name):
+		stats[player_name] = {"kills": 0, "deaths": 0, "wins": 0, "games": 0}
 
 func record_kill(attacker_name: String, victim_name: String) -> void:
 	if attacker_name != victim_name:
@@ -60,10 +60,10 @@ func record_match_end(winner_name: String, participant_names: Array) -> void:
 
 func get_top(n: int = LEADERBOARD_TOP_N) -> Array:
 	var rows: Array = []
-	for name in stats.keys():
-		var s: Dictionary = stats[name]
+	for player_name in stats.keys():
+		var s: Dictionary = stats[player_name]
 		rows.append({
-			"name": name,
+			"name": player_name,
 			"kills": int(s.get("kills", 0)),
 			"deaths": int(s.get("deaths", 0)),
 			"wins": int(s.get("wins", 0)),

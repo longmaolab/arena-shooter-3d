@@ -192,16 +192,16 @@ func _find_animation_player(node: Node) -> AnimationPlayer:
 			return found
 	return null
 
-func _play_anim(name: String) -> void:
-	if _anim_player == null or name == _current_anim:
+func _play_anim(anim: String) -> void:
+	if _anim_player == null or anim == _current_anim:
 		return
-	if not _anim_player.has_animation(name):
+	if not _anim_player.has_animation(anim):
 		return
-	_current_anim = name
+	_current_anim = anim
 	# Cross-fade between movement anims so idle↔walk↔sprint doesn't pop.
 	# 'die' wants no blend so the snap reads clearly.
-	var blend := 0.0 if name == ANIM_DIE else 0.12
-	_anim_player.play(name, blend)
+	var blend := 0.0 if anim == ANIM_DIE else 0.12
+	_anim_player.play(anim, blend)
 
 func _select_anim() -> String:
 	if health <= 0:
@@ -560,7 +560,7 @@ func _reload() -> void:
 # ─── Damage / Death / Respawn ────────────────────────────────────────
 
 @rpc("any_peer", "reliable", "call_local")
-func take_damage_remote(new_health: int, amount: int, attacker_peer_id: int) -> void:
+func take_damage_remote(new_health: int, amount: int, _attacker_peer_id: int) -> void:
 	# Display-only: server has already applied the damage and will trigger the
 	# death sequence itself. We only accept this RPC when it originates from
 	# the server (sender == HOST_PEER_ID for remote, sender == 0 for the host's
