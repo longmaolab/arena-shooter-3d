@@ -187,6 +187,16 @@ func _handle_kill(attacker_peer_id: int, victim_peer_id: int) -> void:
 	StatsStore.record_kill(attacker_name, victim_name)
 	announce_kill.rpc(attacker_peer_id, victim_peer_id)
 
+	# Streak tracking — increment attacker, reset victim, and announce at
+	# meaningful thresholds (2 / 3 / 5 / 7 consecutive kills without dying).
+	if victim_info:
+		victim_info["streak"] = 0
+	if attacker_info and attacker_peer_id != victim_peer_id:
+		var streak: int = int(attacker_info.get("streak", 0)) + 1
+		attacker_info["streak"] = streak
+		if streak == 2 or streak == 3 or streak == 5 or streak == 7:
+			announce_streak.rpc(attacker_peer_id, streak)
+
 	if attacker_info and attacker_info.get("kills", 0) >= KILLS_TO_WIN:
 		game_over = true
 		var participant_names: Array = []
@@ -214,6 +224,11 @@ func _clear_invincibility(peer_id: int) -> void:
 func announce_kill(attacker_peer_id: int, victim_peer_id: int) -> void:
 	if hud and is_instance_valid(hud):
 		hud.show_kill(attacker_peer_id, victim_peer_id)
+
+@rpc("authority", "reliable", "call_local")
+func announce_streak(peer_id: int, streak: int) -> void:
+	if hud and is_instance_valid(hud):
+		hud.show_streak(peer_id, streak)
 
 @rpc("authority", "reliable", "call_local")
 func announce_winner(peer_id: int) -> void:
@@ -259,6 +274,7 @@ func _start_new_game() -> void:
 		for pid in NetworkManager.players.keys():
 			NetworkManager.players[pid]["health"] = SERVER_MAX_HEALTH
 			NetworkManager.players[pid]["invincible"] = false
+			NetworkManager.players[pid]["streak"] = 0
 			respawn_player.rpc_id(pid, _random_spawn_pos())
 
 # ─── Helpers ─────────────────────────────────────────────────────────

@@ -20,6 +20,14 @@ const DEATH_FADE_OUT := 0.4
 const KILL_FEED_LIFETIME := 4.0
 const KILL_BANNER_LIFETIME := 2.5
 
+const STREAK_TEXTS := {2: "DOUBLE KILL", 3: "TRIPLE KILL", 5: "RAMPAGE", 7: "GODLIKE"}
+const STREAK_COLORS := {
+	2: Color(1.0, 0.92, 0.40),
+	3: Color(1.0, 0.62, 0.28),
+	5: Color(1.0, 0.30, 0.30),
+	7: Color(0.78, 0.45, 1.0),
+}
+
 var local_player: Node = null
 var _row_cache: Dictionary = {}
 var _vignette_alpha: float = 0.0
@@ -198,6 +206,16 @@ func _show_kill_banner(text: String, color: Color) -> void:
 	kill_banner.text = text
 	kill_banner.add_theme_color_override("font_color", color)
 	_kill_banner_timer = KILL_BANNER_LIFETIME
+
+func show_streak(peer_id: int, streak: int) -> void:
+	# Streak banner reuses the kill banner pill but with louder text and a
+	# threshold-tier color. Local player gets the announce (no point telling
+	# everyone they're not the one on a tear).
+	if peer_id != multiplayer.get_unique_id():
+		return
+	var label_text: String = STREAK_TEXTS.get(streak, "%dx KILL" % streak)
+	var color: Color = STREAK_COLORS.get(streak, Color(1, 0.92, 0.40))
+	_show_kill_banner("🔥 %s" % label_text, color)
 
 func _fade_and_free(node: CanvasItem, lifetime: float) -> void:
 	await get_tree().create_timer(lifetime - 0.5).timeout

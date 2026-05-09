@@ -157,6 +157,8 @@ func _make_player_entry(skin_index: int = 0, display_name: String = "") -> Dicti
 		# clients see this dict for display fields (name/color/skin) only.
 		"health": 100,
 		"invincible": false,
+		# Consecutive kills without dying — drives the streak announcer.
+		"streak": 0,
 	}
 
 func _on_peer_connected(peer_id: int) -> void:
