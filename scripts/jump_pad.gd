@@ -7,6 +7,9 @@ const JUMP_BOOST := 16.0  # ~5.3m max apex (vs. 1.5m normal jump)
 
 @export var visual_color: Color = Color(0.20, 0.85, 1.0)
 
+var _accent_mat: StandardMaterial3D
+var _arrow: CSGCylinder3D
+
 func _ready() -> void:
 	if get_node_or_null("Visual") == null:
 		_build_default_visual()
@@ -15,25 +18,56 @@ func _ready() -> void:
 	body_entered.connect(_on_body_entered)
 
 func _process(_delta: float) -> void:
-	# Subtle pulse so it reads as interactable, not static geometry.
-	var v := get_node_or_null("Visual") as MeshInstance3D
-	if v:
-		var mat := v.material_override as StandardMaterial3D
-		if mat:
-			mat.emission_energy_multiplier = 2.0 + sin(Time.get_ticks_msec() * 0.005) * 0.6
+	# Pulse the inner glow + bob the upward chevron so it reads as an
+	# interactable launchpad, not static geometry.
+	var t := Time.get_ticks_msec() * 0.001
+	if _accent_mat:
+		_accent_mat.emission_energy_multiplier = 2.4 + sin(t * 5.0) * 0.8
+	if _arrow:
+		_arrow.position.y = 0.42 + 0.08 * sin(t * 3.5)
 
 func _build_default_visual() -> void:
-	var vis := CSGCylinder3D.new()
-	vis.name = "Visual"
-	vis.height = 0.25
-	vis.radius = 0.9
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = visual_color
-	mat.emission_enabled = true
-	mat.emission = visual_color
-	mat.emission_energy_multiplier = 2.0
-	vis.material_override = mat
-	add_child(vis)
+	var holder := Node3D.new()
+	holder.name = "Visual"
+	add_child(holder)
+
+	# Dark base ring — the "machine" the pad sits on. Low-emission, matte.
+	var base_mat := StandardMaterial3D.new()
+	base_mat.albedo_color = Color(0.10, 0.13, 0.22)
+	base_mat.metallic = 0.55
+	base_mat.roughness = 0.45
+	base_mat.emission_enabled = true
+	base_mat.emission = visual_color
+	base_mat.emission_energy_multiplier = 0.20
+	var base := CSGCylinder3D.new()
+	base.height = 0.16
+	base.radius = 1.0
+	base.material_override = base_mat
+	holder.add_child(base)
+
+	# Bright inner disc — this is what pulses, sells the "active" feel.
+	_accent_mat = StandardMaterial3D.new()
+	_accent_mat.albedo_color = visual_color
+	_accent_mat.emission_enabled = true
+	_accent_mat.emission = visual_color
+	_accent_mat.emission_energy_multiplier = 2.4
+	_accent_mat.metallic = 0.0
+	_accent_mat.roughness = 0.30
+	var inner := CSGCylinder3D.new()
+	inner.height = 0.06
+	inner.radius = 0.72
+	inner.position = Vector3(0, 0.10, 0)
+	inner.material_override = _accent_mat
+	holder.add_child(inner)
+
+	# Upward cone chevron — visually says "jump up" without using a label.
+	_arrow = CSGCylinder3D.new()
+	_arrow.cone = true
+	_arrow.height = 0.50
+	_arrow.radius = 0.22
+	_arrow.position = Vector3(0, 0.42, 0)
+	_arrow.material_override = _accent_mat
+	holder.add_child(_arrow)
 
 func _build_default_collision() -> void:
 	var col := CollisionShape3D.new()
