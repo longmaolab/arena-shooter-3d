@@ -48,6 +48,13 @@ var _shoot_rect  := Rect2()
 var _jump_rect   := Rect2()
 var _reload_rect := Rect2()
 
+# Weapon switch chips above the action cluster.
+const WEAPON_LABELS := ["PIS", "SMG", "SHG"]
+const WEAPON_COLORS := [Color(0.85, 0.85, 0.95), Color(0.55, 0.85, 1.0), Color(1.0, 0.65, 0.45)]
+var _weapon_rects := [Rect2(), Rect2(), Rect2()]
+var _weapon_touch_ids := [-1, -1, -1]
+var _active_weapon: int = 1  # mirrors player.current_weapon for visual highlight
+
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -77,6 +84,14 @@ func _recalc_layout() -> void:
 	_shoot_rect  = Rect2(right_x, bottom_y, _btn_size, _btn_size)
 	_reload_rect = Rect2(right_x - _btn_size - BTN_GAP, bottom_y, _btn_size, _btn_size)
 	_jump_rect   = Rect2(right_x, bottom_y - _btn_size - BTN_GAP, _btn_size, _btn_size)
+	# Weapon row sits above JUMP, smaller buttons (~55% of action button size).
+	var w_size: float = _btn_size * 0.55
+	var w_gap: float = 10.0
+	var w_y: float = bottom_y - 2.0 * _btn_size - 2.0 * BTN_GAP - w_size + 4.0
+	var w_right: float = s.x - BTN_MARGIN
+	for i in WEAPON_LABELS.size():
+		var x: float = w_right - (WEAPON_LABELS.size() - i) * (w_size + w_gap) + w_gap
+		_weapon_rects[i] = Rect2(x, w_y, w_size, w_size)
 	queue_redraw()
 
 func _input(event: InputEvent) -> void:
@@ -89,6 +104,12 @@ func _input(event: InputEvent) -> void:
 
 func _handle_touch(event: InputEventScreenTouch) -> void:
 	if event.pressed:
+		var w_idx := _weapon_index_at(event.position)
+		if w_idx >= 0:
+			_weapon_touch_ids[w_idx] = event.index
+			_request_weapon_switch(w_idx)
+			queue_redraw()
+			return
 		if _shoot_rect.has_point(event.position):
 			_shoot_touch_id = event.index
 			Input.action_press(ACTIONS["shoot"])
@@ -130,6 +151,33 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 			queue_redraw()
 		elif event.index == _look_touch_id:
 			_look_touch_id = -1
+		else:
+			for i in _weapon_touch_ids.size():
+				if event.index == _weapon_touch_ids[i]:
+					_weapon_touch_ids[i] = -1
+					queue_redraw()
+					break
+
+func _weapon_index_at(pos: Vector2) -> int:
+	for i in _weapon_rects.size():
+		if _weapon_rects[i].has_point(pos):
+			return i
+	return -1
+
+func _request_weapon_switch(idx: int) -> void:
+	var p := get_tree().get_first_node_in_group("local_player")
+	if p == null or not p.has_method("switch_weapon"):
+		return
+	p.switch_weapon(idx)
+	_active_weapon = idx
+	# Listen to confirmed weapon changes so a server bump or auto-switch
+	# updates our highlight too.
+	if not p.local_weapon_changed.is_connected(_on_player_weapon_changed):
+		p.local_weapon_changed.connect(_on_player_weapon_changed)
+
+func _on_player_weapon_changed(idx: int, _name: String, _ammo: int, _max: int) -> void:
+	_active_weapon = idx
+	queue_redraw()
 
 func _clamp_joystick_origin(p: Vector2) -> Vector2:
 	# Keep the ring fully on-screen so all directions reach max throw.
@@ -184,6 +232,10 @@ func _draw() -> void:
 	_draw_button(_shoot_rect, "FIRE", Color(1, 0.35, 0.35), _shoot_touch_id != -1)
 	_draw_button(_jump_rect, "JUMP", Color(0.4, 0.7, 1), _jump_touch_id != -1)
 	_draw_button(_reload_rect, "RELOAD", Color(1, 0.85, 0.4), _reload_touch_id != -1)
+	for i in WEAPON_LABELS.size():
+		_draw_button(
+			_weapon_rects[i], WEAPON_LABELS[i], WEAPON_COLORS[i],
+			i == _active_weapon)
 
 func _draw_joystick() -> void:
 	# Faint base ring

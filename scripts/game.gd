@@ -8,9 +8,16 @@ const PLAYER_SCENE := preload("res://scenes/player.tscn")
 
 # Server-authoritative combat constants. Damage is NOT trusted from clients.
 const SERVER_MAX_HEALTH := 100
-const SERVER_BULLET_DAMAGE := 25
-const SERVER_HEADSHOT_DAMAGE := 50
 const SERVER_RESPAWN_INVINCIBILITY := 1.5
+# Mirror of player.gd::WEAPONS but only the damage columns the server cares
+# about. Index matches the player-side WEAPONS array (0=PISTOL, 1=SMG, 2=SHOTGUN).
+# Shotgun "body"/"head" are *per pellet* — five pellets all landing means
+# 5×18=90 body or 5×36=180 head at point blank.
+const SERVER_WEAPON_DAMAGE := [
+	{"body": 50, "head": 100},
+	{"body": 25, "head": 50},
+	{"body": 18, "head": 36},
+]
 
 @onready var spawn_points: Node3D = $SpawnPoints
 @onready var players_root: Node3D = $Players
@@ -96,10 +103,11 @@ func _remote_despawn(peer_id: int) -> void:
 # ─── Combat resolution (server authoritative) ───────────────────────
 
 @rpc("any_peer", "reliable", "call_local")
-func server_report_hit(victim_peer_id: int, is_headshot: bool, hit_pos: Vector3) -> void:
-	# Server-authoritative: damage is NOT taken from the client. The headshot
-	# claim is just a hint — server re-validates the impact Y is within the
-	# victim's actual head region before granting the bonus damage.
+func server_report_hit(victim_peer_id: int, weapon_idx: int, is_headshot: bool, hit_pos: Vector3) -> void:
+	# Server-authoritative: damage is NOT taken from the client. Both the
+	# weapon index and the headshot claim are hints — the server clamps the
+	# weapon index to a known table and re-validates the impact Y before
+	# granting bonus damage.
 	if not NetworkManager.is_server() or game_over:
 		return
 	var attacker_peer_id := multiplayer.get_remote_sender_id()
@@ -127,7 +135,10 @@ func server_report_hit(victim_peer_id: int, is_headshot: bool, hit_pos: Vector3)
 	if is_headshot and victim_node and is_instance_valid(victim_node):
 		var dy: float = hit_pos.y - victim_node.global_position.y
 		validated_headshot = dy > 1.0 and dy < 2.5
-	var damage: int = SERVER_HEADSHOT_DAMAGE if validated_headshot else SERVER_BULLET_DAMAGE
+	# Look up damage from the server-side weapon table (clamped, never trusted from client).
+	var safe_idx: int = clampi(weapon_idx, 0, SERVER_WEAPON_DAMAGE.size() - 1)
+	var dmg_row: Dictionary = SERVER_WEAPON_DAMAGE[safe_idx]
+	var damage: int = int(dmg_row["head"]) if validated_headshot else int(dmg_row["body"])
 	var new_health: int = max(0, current_health - damage)
 	victim_info["health"] = new_health
 	if victim_node and is_instance_valid(victim_node) and not victim_node.is_queued_for_deletion():

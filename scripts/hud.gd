@@ -27,6 +27,7 @@ var _countdown_left: float = 0.0
 var _show_countdown_text: bool = false
 var _kill_banner_timer: float = 0.0
 var _hit_marker_tween: Tween = null
+var _current_weapon_name: String = "AMMO"
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -69,8 +70,14 @@ func _on_local_player_spawned(p: Node) -> void:
 		p.local_respawned.connect(_on_local_respawned)
 	if not p.local_hit_marker.is_connected(_on_hit_marker):
 		p.local_hit_marker.connect(_on_hit_marker)
+	if not p.local_weapon_changed.is_connected(_on_weapon_changed):
+		p.local_weapon_changed.connect(_on_weapon_changed)
 	_on_health(p.health)
-	_on_ammo(p.ammo)
+	# Seed weapon + ammo display from whatever the player currently holds.
+	if p.has_method("get_weapon_info"):
+		var info: Dictionary = p.get_weapon_info()
+		_on_weapon_changed(int(info["index"]), str(info["name"]),
+			int(info["ammo"]), int(info["max_ammo"]))
 
 func _on_hit_marker() -> void:
 	# Burst hits within <140ms used to spawn overlapping tweens fighting over
@@ -103,7 +110,11 @@ func _on_health(h: int) -> void:
 		fill.bg_color = bar_color
 
 func _on_ammo(a: int) -> void:
-	ammo_label.text = "AMMO  %d" % a
+	ammo_label.text = "%s  %d" % [_current_weapon_name, a]
+
+func _on_weapon_changed(_weapon_index: int, weapon_name: String, ammo_count: int, _max_ammo: int) -> void:
+	_current_weapon_name = weapon_name
+	_on_ammo(ammo_count)
 
 func _on_damage_taken(amount: int) -> void:
 	# Cap at 0.45 so a burst of damage doesn't black out the screen.

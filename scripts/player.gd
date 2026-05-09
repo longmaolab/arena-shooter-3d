@@ -6,6 +6,7 @@ signal local_damage_taken(amount: int)
 signal local_died()
 signal local_respawned()
 signal local_hit_marker()
+signal local_weapon_changed(weapon_index: int, weapon_name: String, ammo_count: int, max_ammo: int)
 
 const SPEED            := 6.0
 const SPRINT_SPEED     := 10.0
@@ -14,11 +15,13 @@ const GRAVITY          := 24.0
 const MOUSE_SENSITIVITY := 0.0022
 const TOUCH_LOOK_SENSITIVITY := 0.005
 const MAX_HEALTH       := 100
-const MAX_AMMO         := 30
-const RELOAD_TIME      := 1.4
-const FIRE_RATE        := 0.12
-# Bullet damage lives on the server (game.gd::SERVER_BULLET_DAMAGE) — clients
-# don't get to choose how hard they hit.
+# Per-weapon stats. Damage values live on the server (game.gd::SERVER_WEAPON_DAMAGE)
+# so clients can never inflate them.
+const WEAPONS := [
+	{"name": "PISTOL",  "fire_rate": 0.40, "max_ammo": 12, "spread": 0.00, "pellets": 1, "reload_time": 1.2},
+	{"name": "SMG",     "fire_rate": 0.12, "max_ammo": 30, "spread": 0.02, "pellets": 1, "reload_time": 1.4},
+	{"name": "SHOTGUN", "fire_rate": 0.80, "max_ammo": 8,  "spread": 0.18, "pellets": 5, "reload_time": 2.2},
+]
 const SYNC_INTERVAL    := 0.05
 const RESPAWN_INVINCIBILITY := 1.5
 
@@ -38,7 +41,9 @@ const SFX_DEATH := preload("res://audio/death.ogg")
 const SFX_RESPAWN := preload("res://audio/respawn.ogg")
 
 var health: int = MAX_HEALTH
-var ammo: int = MAX_AMMO
+# Default to SMG (index 1) so the v6.0–v6.8 feel is preserved.
+var current_weapon: int = 1
+var weapon_ammo: Array[int] = [12, 30, 8]
 var can_shoot: bool = true
 var is_reloading: bool = false
 var is_invincible: bool = false
@@ -77,6 +82,11 @@ func _setup_authority_visuals() -> void:
 		name_label.visible = false
 		camera.current = true
 		_grab_mouse()
+		# Push initial weapon state to whoever's listening (HUD).
+		var w: Dictionary = WEAPONS[current_weapon]
+		local_weapon_changed.emit(
+			current_weapon, str(w["name"]),
+			weapon_ammo[current_weapon], int(w["max_ammo"]))
 	else:
 		camera.current = false
 		ray.enabled = false
@@ -183,8 +193,38 @@ func _unhandled_input(event: InputEvent) -> void:
 		rotate_y(-event.relative.x * MOUSE_SENSITIVITY)
 		camera.rotate_x(-event.relative.y * MOUSE_SENSITIVITY)
 		camera.rotation.x = clamp(camera.rotation.x, -1.25, 1.25)
-	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED else Input.MOUSE_MODE_CAPTURED
+	if event is InputEventKey and event.pressed:
+		match event.keycode:
+			KEY_1: switch_weapon(0)
+			KEY_2: switch_weapon(1)
+			KEY_3: switch_weapon(2)
+			KEY_ESCAPE:
+				Input.mouse_mode = (Input.MOUSE_MODE_VISIBLE
+					if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
+					else Input.MOUSE_MODE_CAPTURED)
+
+# ─── Weapon switching (called from keyboard or touch buttons) ─────────
+
+func switch_weapon(idx: int) -> void:
+	if not is_multiplayer_authority():
+		return
+	if idx == current_weapon or idx < 0 or idx >= WEAPONS.size():
+		return
+	is_reloading = false
+	current_weapon = idx
+	var w: Dictionary = WEAPONS[idx]
+	local_weapon_changed.emit(
+		idx, str(w["name"]), weapon_ammo[idx], int(w["max_ammo"]))
+	local_ammo_changed.emit(weapon_ammo[idx])
+
+func get_weapon_info() -> Dictionary:
+	var w: Dictionary = WEAPONS[current_weapon]
+	return {
+		"index": current_weapon,
+		"name": str(w["name"]),
+		"ammo": weapon_ammo[current_weapon],
+		"max_ammo": int(w["max_ammo"]),
+	}
 
 func _physics_process(delta: float) -> void:
 	if not is_on_floor():
@@ -230,46 +270,73 @@ func _remote_state(pos: Vector3, rot_y: float, cam_x: float, anim_name: String) 
 func _try_shoot() -> void:
 	if not can_shoot or is_reloading:
 		return
-	if ammo <= 0:
+	var w: Dictionary = WEAPONS[current_weapon]
+	if weapon_ammo[current_weapon] <= 0:
 		_reload()
 		return
 	can_shoot = false
-	ammo -= 1
-	local_ammo_changed.emit(ammo)
-	ray.force_raycast_update()
+	weapon_ammo[current_weapon] -= 1
+	local_ammo_changed.emit(weapon_ammo[current_weapon])
+
+	var pellets: int = int(w.get("pellets", 1))
+	var spread: float = float(w.get("spread", 0.0))
+	var fire_rate: float = float(w.get("fire_rate", 0.12))
+
 	var start_pos: Vector3 = muzzle.global_position
-	var end_pos: Vector3
-	var hit_normal := Vector3.UP
-	var hit_player := false
-	if ray.is_colliding():
-		end_pos = ray.get_collision_point()
-		hit_normal = ray.get_collision_normal()
-		var victim := _find_player_root(ray.get_collider() as Node)
-		if victim and victim != self:
-			hit_player = true
-			var victim_peer_id: int = victim.get_multiplayer_authority()
-			# Headshot if the impact landed in the upper third of the capsule
-			# (capsule center y = 0.85, total height 1.7, so y > origin + 1.4 ≈ head).
-			# Server still validates this claim before granting the bonus damage.
-			var is_headshot: bool = (end_pos.y - victim.global_position.y) > 1.4
-			_game.server_report_hit.rpc_id(
-				NetworkManager.HOST_PEER_ID, victim_peer_id, is_headshot, end_pos)
-	else:
-		end_pos = camera.global_position + (-camera.global_transform.basis.z) * 80.0
-	_fire_fx.rpc(start_pos, end_pos, hit_player)
-	if ray.is_colliding() and not hit_player:
-		_spawn_impact(end_pos, hit_normal)
-	if hit_player:
+	var ends: Array = []
+	var hit_flags: Array = []
+	var any_hit_player := false
+	var orig_target: Vector3 = ray.target_position
+
+	for i in pellets:
+		# First pellet uses the natural aim; subsequent pellets get random
+		# spread. Pistol's spread is 0 anyway so it always hits dead center.
+		if spread > 0.0 and i > 0:
+			var dx: float = randf_range(-spread, spread)
+			var dy: float = randf_range(-spread, spread)
+			ray.target_position = Vector3(dx, dy, -1).normalized() * 100.0
+		else:
+			ray.target_position = orig_target
+		ray.force_raycast_update()
+		var end_pos: Vector3
+		var hit_normal := Vector3.UP
+		var hit_player := false
+		if ray.is_colliding():
+			end_pos = ray.get_collision_point()
+			hit_normal = ray.get_collision_normal()
+			var victim := _find_player_root(ray.get_collider() as Node)
+			if victim and victim != self:
+				hit_player = true
+				any_hit_player = true
+				var victim_peer_id: int = victim.get_multiplayer_authority()
+				var is_headshot: bool = (end_pos.y - victim.global_position.y) > 1.4
+				_game.server_report_hit.rpc_id(
+					NetworkManager.HOST_PEER_ID,
+					victim_peer_id, current_weapon, is_headshot, end_pos)
+		else:
+			end_pos = camera.global_position + (-camera.global_transform.basis.z) * 80.0
+		ends.append(end_pos)
+		hit_flags.append(hit_player)
+		if ray.is_colliding() and not hit_player:
+			_spawn_impact(end_pos, hit_normal)
+
+	ray.target_position = orig_target
+	_fire_fx.rpc(start_pos, ends, hit_flags)
+	if any_hit_player:
 		local_hit_marker.emit()
-	await get_tree().create_timer(FIRE_RATE).timeout
+	await get_tree().create_timer(fire_rate).timeout
 	can_shoot = true
 
 @rpc("any_peer", "unreliable", "call_local")
-func _fire_fx(start: Vector3, end: Vector3, hit_player: bool) -> void:
+func _fire_fx(start: Vector3, ends: Array, hit_flags: Array) -> void:
+	# Single sound + single muzzle flash regardless of pellet count, but one
+	# tracer per pellet so a shotgun blast reads as a spread of beams.
 	audio_3d.stream = SFX_SHOOT
 	audio_3d.play()
-	_spawn_tracer(start, end, hit_player)
 	_flash_muzzle()
+	for i in ends.size():
+		var hit: bool = bool(hit_flags[i]) if i < hit_flags.size() else false
+		_spawn_tracer(start, ends[i], hit)
 
 func _flash_muzzle() -> void:
 	if not is_instance_valid(muzzle):
@@ -329,13 +396,19 @@ func _spawn_impact(pos: Vector3, normal: Vector3) -> void:
 		impact.queue_free()
 
 func _reload() -> void:
-	if is_reloading or ammo == MAX_AMMO:
+	if is_reloading:
+		return
+	var w: Dictionary = WEAPONS[current_weapon]
+	var max_a: int = int(w["max_ammo"])
+	if weapon_ammo[current_weapon] >= max_a:
 		return
 	is_reloading = true
-	await get_tree().create_timer(RELOAD_TIME).timeout
-	ammo = MAX_AMMO
+	await get_tree().create_timer(float(w["reload_time"])).timeout
+	# Player may have switched weapons mid-reload; only refill what they
+	# were actually reloading.
+	weapon_ammo[current_weapon] = int(WEAPONS[current_weapon]["max_ammo"])
 	is_reloading = false
-	local_ammo_changed.emit(ammo)
+	local_ammo_changed.emit(weapon_ammo[current_weapon])
 
 # ─── Damage / Death / Respawn ────────────────────────────────────────
 
@@ -390,8 +463,11 @@ func notify_ammo_restored() -> void:
 			return
 	elif sender != NetworkManager.HOST_PEER_ID:
 		return
-	ammo = MAX_AMMO
-	local_ammo_changed.emit(ammo)
+	# Refill ALL weapons — a single ammo crate is generous since the player
+	# might be empty on multiple guns.
+	for i in WEAPONS.size():
+		weapon_ammo[i] = int(WEAPONS[i]["max_ammo"])
+	local_ammo_changed.emit(weapon_ammo[current_weapon])
 	audio_2d.stream = SFX_RESPAWN
 	audio_2d.play()
 
@@ -415,11 +491,12 @@ func respawn_at(pos: Vector3) -> void:
 	if not is_multiplayer_authority():
 		return
 	health = MAX_HEALTH
-	ammo = MAX_AMMO
+	for i in WEAPONS.size():
+		weapon_ammo[i] = int(WEAPONS[i]["max_ammo"])
 	velocity = Vector3.ZERO
 	global_position = pos
 	local_health_changed.emit(health)
-	local_ammo_changed.emit(ammo)
+	local_ammo_changed.emit(weapon_ammo[current_weapon])
 	local_respawned.emit()
 	# Local-only respawn chime.
 	audio_2d.stream = SFX_RESPAWN
