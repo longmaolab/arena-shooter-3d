@@ -1,6 +1,195 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=18 format=3]
 
 [ext_resource type="Script" path="res://scripts/main_menu.gd" id="1"]
+
+[sub_resource type="Gradient" id="bg_grad"]
+offsets = PackedFloat32Array(0, 0.55, 1)
+colors = PackedColorArray(0.05, 0.03, 0.14, 1, 0.10, 0.06, 0.30, 1, 0.22, 0.12, 0.46, 1)
+
+[sub_resource type="GradientTexture2D" id="bg_tex"]
+gradient = SubResource("bg_grad")
+fill_from = Vector2(0.5, 0)
+fill_to = Vector2(0.5, 1)
+width = 64
+height = 512
+
+[sub_resource type="Gradient" id="glow_grad"]
+offsets = PackedFloat32Array(0, 1)
+colors = PackedColorArray(0.55, 0.30, 1, 0.45, 0.55, 0.30, 1, 0)
+
+[sub_resource type="GradientTexture2D" id="glow_tex"]
+gradient = SubResource("glow_grad")
+width = 256
+height = 256
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
+
+[sub_resource type="StyleBoxFlat" id="panel_glass"]
+bg_color = Color(0.10, 0.08, 0.22, 0.92)
+border_color = Color(0.48, 0.25, 0.92, 0.55)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+corner_radius_top_left = 24
+corner_radius_top_right = 24
+corner_radius_bottom_right = 24
+corner_radius_bottom_left = 24
+content_margin_left = 26
+content_margin_right = 26
+content_margin_top = 22
+content_margin_bottom = 22
+shadow_color = Color(0, 0, 0, 0.55)
+shadow_size = 18
+
+[sub_resource type="StyleBoxFlat" id="lb_panel_glass"]
+bg_color = Color(0.08, 0.07, 0.20, 0.92)
+border_color = Color(1, 0.85, 0.30, 0.45)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+corner_radius_top_left = 24
+corner_radius_top_right = 24
+corner_radius_bottom_right = 24
+corner_radius_bottom_left = 24
+content_margin_left = 22
+content_margin_right = 22
+content_margin_top = 20
+content_margin_bottom = 20
+shadow_color = Color(0, 0, 0, 0.55)
+shadow_size = 18
+
+[sub_resource type="StyleBoxFlat" id="play_normal"]
+bg_color = Color(0.18, 0.80, 0.44, 1)
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
+content_margin_left = 20
+content_margin_right = 20
+content_margin_top = 16
+content_margin_bottom = 16
+shadow_color = Color(0.10, 0.50, 0.26, 0.6)
+shadow_size = 10
+shadow_offset = Vector2(0, 4)
+
+[sub_resource type="StyleBoxFlat" id="play_hover"]
+bg_color = Color(0.30, 0.92, 0.56, 1)
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
+content_margin_left = 20
+content_margin_right = 20
+content_margin_top = 16
+content_margin_bottom = 16
+
+[sub_resource type="StyleBoxFlat" id="play_pressed"]
+bg_color = Color(0.14, 0.62, 0.34, 1)
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
+content_margin_left = 20
+content_margin_right = 20
+content_margin_top = 16
+content_margin_bottom = 16
+
+[sub_resource type="StyleBoxFlat" id="host_normal"]
+bg_color = Color(0.18, 0.14, 0.34, 1)
+border_color = Color(0.48, 0.32, 0.86, 0.55)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+content_margin_left = 14
+content_margin_right = 14
+content_margin_top = 8
+content_margin_bottom = 8
+
+[sub_resource type="StyleBoxFlat" id="host_hover"]
+bg_color = Color(0.26, 0.20, 0.46, 1)
+border_color = Color(0.66, 0.42, 1, 0.75)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+content_margin_left = 14
+content_margin_right = 14
+content_margin_top = 8
+content_margin_bottom = 8
+
+[sub_resource type="StyleBoxFlat" id="host_pressed"]
+bg_color = Color(0.14, 0.10, 0.26, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+content_margin_left = 14
+content_margin_right = 14
+content_margin_top = 8
+content_margin_bottom = 8
+
+[sub_resource type="StyleBoxFlat" id="arrow_normal"]
+bg_color = Color(0.22, 0.18, 0.42, 1)
+corner_radius_top_left = 32
+corner_radius_top_right = 32
+corner_radius_bottom_right = 32
+corner_radius_bottom_left = 32
+
+[sub_resource type="StyleBoxFlat" id="arrow_hover"]
+bg_color = Color(0.36, 0.30, 0.58, 1)
+corner_radius_top_left = 32
+corner_radius_top_right = 32
+corner_radius_bottom_right = 32
+corner_radius_bottom_left = 32
+
+[sub_resource type="StyleBoxFlat" id="arrow_pressed"]
+bg_color = Color(0.16, 0.12, 0.30, 1)
+corner_radius_top_left = 32
+corner_radius_top_right = 32
+corner_radius_bottom_right = 32
+corner_radius_bottom_left = 32
+
+[sub_resource type="StyleBoxFlat" id="line_edit"]
+bg_color = Color(0.07, 0.06, 0.16, 1)
+border_color = Color(0.42, 0.28, 0.70, 0.65)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+content_margin_left = 12
+content_margin_right = 12
+content_margin_top = 8
+content_margin_bottom = 8
+
+[sub_resource type="StyleBoxFlat" id="preview_card"]
+bg_color = Color(0.04, 0.03, 0.10, 1)
+border_color = Color(1, 0.85, 0.30, 0.85)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+shadow_color = Color(1, 0.85, 0.30, 0.25)
+shadow_size = 8
 
 [node name="MainMenu" type="Control"]
 anchors_preset = 15
@@ -12,7 +201,45 @@ script = ExtResource("1")
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-color = Color(0.08, 0.10, 0.14, 1)
+mouse_filter = 2
+color = Color(0.05, 0.03, 0.14, 1)
+
+[node name="BgGradient" type="TextureRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+texture = SubResource("bg_tex")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="Glow1" type="TextureRect" parent="."]
+anchors_preset = 0
+offset_left = -120.0
+offset_top = -80.0
+offset_right = 480.0
+offset_bottom = 520.0
+mouse_filter = 2
+texture = SubResource("glow_tex")
+expand_mode = 1
+stretch_mode = 6
+modulate = Color(1, 1, 1, 0.6)
+
+[node name="Glow2" type="TextureRect" parent="."]
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -540.0
+offset_top = -540.0
+offset_right = 60.0
+offset_bottom = 60.0
+mouse_filter = 2
+texture = SubResource("glow_tex")
+expand_mode = 1
+stretch_mode = 6
+modulate = Color(1, 0.55, 0.85, 0.45)
 
 [node name="Center" type="CenterContainer" parent="."]
 anchors_preset = 15
@@ -20,90 +247,122 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 
 [node name="Cols" type="HBoxContainer" parent="Center"]
-theme_override_constants/separation = 24
+theme_override_constants/separation = 28
 
 [node name="Panel" type="PanelContainer" parent="Center/Cols"]
-custom_minimum_size = Vector2(440, 0)
+custom_minimum_size = Vector2(460, 0)
+theme_override_styles/panel = SubResource("panel_glass")
 
 [node name="VBox" type="VBoxContainer" parent="Center/Cols/Panel"]
-theme_override_constants/separation = 10
+theme_override_constants/separation = 12
 
 [node name="Title" type="Label" parent="Center/Cols/Panel/VBox"]
-text = "ARENA SHOOTER 3D"
+text = "ARENA SHOOTER"
 horizontal_alignment = 1
-theme_override_font_sizes/font_size = 32
-theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
+theme_override_font_sizes/font_size = 38
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0.34, 0.12, 0.62, 1)
+theme_override_constants/outline_size = 6
 
 [node name="Subtitle" type="Label" parent="Center/Cols/Panel/VBox"]
-text = "Multiplayer  v5  (PvP)"
+text = "★ MULTIPLAYER  PVP  v6 ★"
 horizontal_alignment = 1
-theme_override_font_sizes/font_size = 16
-theme_override_colors/font_color = Color(0.7, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 13
+theme_override_colors/font_color = Color(1, 0.85, 0.30, 1)
 
 [node name="Sep1" type="HSeparator" parent="Center/Cols/Panel/VBox"]
 
 [node name="NameLabel" type="Label" parent="Center/Cols/Panel/VBox"]
-text = "Your name"
-theme_override_font_sizes/font_size = 14
+text = "👤  YOUR NAME"
+theme_override_font_sizes/font_size = 13
+theme_override_colors/font_color = Color(0.72, 0.74, 0.92, 1)
 
 [node name="NameInput" type="LineEdit" parent="Center/Cols/Panel/VBox"]
 text = "Player"
 max_length = 16
 theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("line_edit")
+theme_override_styles/focus = SubResource("line_edit")
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/caret_color = Color(0.66, 0.45, 1, 1)
 virtual_keyboard_enabled = true
 virtual_keyboard_show_on_focus = true
 
 [node name="Sep2" type="HSeparator" parent="Center/Cols/Panel/VBox"]
 
 [node name="SkinHeader" type="Label" parent="Center/Cols/Panel/VBox"]
-text = "Pick your character"
-theme_override_font_sizes/font_size = 14
+text = "🎭  PICK YOUR CHARACTER"
+theme_override_font_sizes/font_size = 13
+theme_override_colors/font_color = Color(0.72, 0.74, 0.92, 1)
 
 [node name="SkinPicker" type="HBoxContainer" parent="Center/Cols/Panel/VBox"]
 alignment = 1
-theme_override_constants/separation = 10
+theme_override_constants/separation = 14
 
 [node name="PrevBtn" type="Button" parent="Center/Cols/Panel/VBox/SkinPicker"]
-custom_minimum_size = Vector2(50, 100)
-text = "<"
-theme_override_font_sizes/font_size = 24
+custom_minimum_size = Vector2(64, 120)
+text = "◀"
+theme_override_font_sizes/font_size = 28
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_styles/normal = SubResource("arrow_normal")
+theme_override_styles/hover = SubResource("arrow_hover")
+theme_override_styles/pressed = SubResource("arrow_pressed")
 
 [node name="PreviewBg" type="PanelContainer" parent="Center/Cols/Panel/VBox/SkinPicker"]
-custom_minimum_size = Vector2(100, 100)
+custom_minimum_size = Vector2(120, 120)
+theme_override_styles/panel = SubResource("preview_card")
 
 [node name="Preview" type="TextureRect" parent="Center/Cols/Panel/VBox/SkinPicker/PreviewBg"]
 expand_mode = 1
 stretch_mode = 5
 
 [node name="NextBtn" type="Button" parent="Center/Cols/Panel/VBox/SkinPicker"]
-custom_minimum_size = Vector2(50, 100)
-text = ">"
-theme_override_font_sizes/font_size = 24
+custom_minimum_size = Vector2(64, 120)
+text = "▶"
+theme_override_font_sizes/font_size = 28
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_styles/normal = SubResource("arrow_normal")
+theme_override_styles/hover = SubResource("arrow_hover")
+theme_override_styles/pressed = SubResource("arrow_pressed")
 
 [node name="SkinName" type="Label" parent="Center/Cols/Panel/VBox"]
 text = "Skin A  (1/18)"
 horizontal_alignment = 1
 theme_override_font_sizes/font_size = 12
-theme_override_colors/font_color = Color(0.85, 0.85, 0.95, 1)
+theme_override_colors/font_color = Color(1, 0.85, 0.30, 1)
 
 [node name="Sep3" type="HSeparator" parent="Center/Cols/Panel/VBox"]
 
-[node name="HostBtn" type="Button" parent="Center/Cols/Panel/VBox"]
-text = "Host"
-custom_minimum_size = Vector2(0, 38)
-theme_override_font_sizes/font_size = 18
+[node name="JoinBtn" type="Button" parent="Center/Cols/Panel/VBox"]
+text = "▶  PLAY"
+custom_minimum_size = Vector2(0, 64)
+theme_override_font_sizes/font_size = 30
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0.10, 0.40, 0.20, 1)
+theme_override_constants/outline_size = 4
+theme_override_styles/normal = SubResource("play_normal")
+theme_override_styles/hover = SubResource("play_hover")
+theme_override_styles/pressed = SubResource("play_pressed")
 
 [node name="IPInput" type="LineEdit" parent="Center/Cols/Panel/VBox"]
 placeholder_text = "Server URL (auto)"
 text = ""
-theme_override_font_sizes/font_size = 14
+theme_override_font_sizes/font_size = 12
+theme_override_styles/normal = SubResource("line_edit")
+theme_override_styles/focus = SubResource("line_edit")
+theme_override_colors/font_color = Color(0.85, 0.85, 0.95, 1)
 virtual_keyboard_enabled = true
 virtual_keyboard_show_on_focus = true
 
-[node name="JoinBtn" type="Button" parent="Center/Cols/Panel/VBox"]
-text = "Join"
-custom_minimum_size = Vector2(0, 44)
-theme_override_font_sizes/font_size = 22
+[node name="HostBtn" type="Button" parent="Center/Cols/Panel/VBox"]
+text = "Host (LAN)"
+custom_minimum_size = Vector2(0, 36)
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.88, 0.86, 1, 1)
+theme_override_styles/normal = SubResource("host_normal")
+theme_override_styles/hover = SubResource("host_hover")
+theme_override_styles/pressed = SubResource("host_pressed")
+theme_override_styles/disabled = SubResource("host_normal")
 
 [node name="Sep4" type="HSeparator" parent="Center/Cols/Panel/VBox"]
 
@@ -111,36 +370,39 @@ theme_override_font_sizes/font_size = 22
 text = ""
 horizontal_alignment = 1
 theme_override_font_sizes/font_size = 12
-theme_override_colors/font_color = Color(0.7, 1, 0.7, 1)
+theme_override_colors/font_color = Color(0.65, 1, 0.72, 1)
 
 [node name="Tips" type="Label" parent="Center/Cols/Panel/VBox"]
 text = "Local 2-window test: Window1 = Host, Window2 = Join (IP=127.0.0.1)"
 horizontal_alignment = 1
 autowrap_mode = 2
 theme_override_font_sizes/font_size = 10
-theme_override_colors/font_color = Color(0.6, 0.6, 0.7, 1)
+theme_override_colors/font_color = Color(0.55, 0.55, 0.70, 1)
 
 [node name="LeaderboardPanel" type="PanelContainer" parent="Center/Cols"]
-custom_minimum_size = Vector2(320, 520)
+custom_minimum_size = Vector2(340, 540)
+theme_override_styles/panel = SubResource("lb_panel_glass")
 
 [node name="LBox" type="VBoxContainer" parent="Center/Cols/LeaderboardPanel"]
-theme_override_constants/separation = 6
+theme_override_constants/separation = 8
 
 [node name="LBTitle" type="Label" parent="Center/Cols/LeaderboardPanel/LBox"]
-text = "🏆 LEADERBOARD"
+text = "🏆  LEADERBOARD"
 horizontal_alignment = 1
-theme_override_font_sizes/font_size = 22
-theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
+theme_override_font_sizes/font_size = 24
+theme_override_colors/font_color = Color(1, 0.85, 0.30, 1)
+theme_override_colors/font_outline_color = Color(0.30, 0.10, 0.55, 1)
+theme_override_constants/outline_size = 4
 
 [node name="LBHeader" type="Label" parent="Center/Cols/LeaderboardPanel/LBox"]
-text = "Rank  Name              W   K   D"
+text = "RANK   PLAYER          W    K    D"
 theme_override_font_sizes/font_size = 12
-theme_override_colors/font_color = Color(0.6, 0.7, 0.85, 1)
+theme_override_colors/font_color = Color(0.62, 0.70, 0.88, 1)
 
 [node name="LBSep" type="HSeparator" parent="Center/Cols/LeaderboardPanel/LBox"]
 
 [node name="LBRows" type="VBoxContainer" parent="Center/Cols/LeaderboardPanel/LBox"]
-theme_override_constants/separation = 4
+theme_override_constants/separation = 6
 
 [node name="LBEmpty" type="Label" parent="Center/Cols/LeaderboardPanel/LBox"]
 text = "(play a match to fill this in)"

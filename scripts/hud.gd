@@ -1,13 +1,15 @@
 extends CanvasLayer
 
-@onready var hp_label: Label = $Margin/VBox/HealthLabel
-@onready var ammo_label: Label = $Margin/VBox/AmmoLabel
-@onready var scoreboard: VBoxContainer = $Right/Scoreboard
+@onready var hp_label: Label = $BottomLeft/VBox/HealthCard/HealthInner/HealthRow/HealthLabel
+@onready var hp_bar: ProgressBar = $BottomLeft/VBox/HealthCard/HealthInner/HealthBar
+@onready var ammo_label: Label = $BottomLeft/VBox/AmmoCard/AmmoRow/AmmoLabel
+@onready var scoreboard: VBoxContainer = $Right/ScoreboardPanel/Scoreboard
 @onready var center_label: Label = $CenterLabel
 @onready var damage_vignette: TextureRect = $DamageVignette
 @onready var death_overlay: ColorRect = $DeathOverlay
 @onready var kill_feed: VBoxContainer = $KillFeed/Items
-@onready var kill_banner: Label = $KillBanner
+@onready var kill_banner_panel: PanelContainer = $KillBannerPanel
+@onready var kill_banner: Label = $KillBannerPanel/KillBanner
 @onready var lb_panel: PanelContainer = $LeaderboardPanel
 @onready var lb_rows: VBoxContainer = $LeaderboardPanel/LBox/LBRows
 @onready var hit_marker: Label = $HitMarker
@@ -31,7 +33,7 @@ func _ready() -> void:
 	center_label.visible = false
 	damage_vignette.modulate.a = 0.0
 	death_overlay.modulate.a = 0.0
-	kill_banner.visible = false
+	kill_banner_panel.visible = false
 	lb_panel.visible = false
 
 func _process(delta: float) -> void:
@@ -44,7 +46,7 @@ func _process(delta: float) -> void:
 	if _kill_banner_timer > 0.0:
 		_kill_banner_timer = max(0.0, _kill_banner_timer - delta)
 		if _kill_banner_timer == 0.0:
-			kill_banner.visible = false
+			kill_banner_panel.visible = false
 
 func bind_to_game(g: Node) -> void:
 	if not NetworkManager.player_list_changed.is_connected(_refresh_scoreboard):
@@ -84,11 +86,24 @@ func _on_hit_marker() -> void:
 	_hit_marker_tween.parallel().tween_property(hit_marker, "modulate:a", 0.0, 0.14)
 
 func _on_health(h: int) -> void:
-	hp_label.text = "HP: %d" % max(0, h)
-	hp_label.modulate = Color(1, 0.4, 0.4) if h < 40 else Color(1, 1, 1)
+	var hp_clamped: int = maxi(0, h)
+	hp_label.text = "HP  %d" % hp_clamped
+	hp_label.modulate = Color(1, 0.4, 0.4) if hp_clamped < 40 else Color(1, 1, 1)
+	hp_bar.value = hp_clamped
+	# Bar tints from green → amber → red as HP drops.
+	var bar_color: Color
+	if hp_clamped < 30:
+		bar_color = Color(1, 0.30, 0.30)
+	elif hp_clamped < 60:
+		bar_color = Color(1, 0.75, 0.30)
+	else:
+		bar_color = Color(0.30, 0.92, 0.50)
+	var fill := hp_bar.get_theme_stylebox("fill") as StyleBoxFlat
+	if fill:
+		fill.bg_color = bar_color
 
 func _on_ammo(a: int) -> void:
-	ammo_label.text = "AMMO: %d" % a
+	ammo_label.text = "AMMO  %d" % a
 
 func _on_damage_taken(amount: int) -> void:
 	# Cap at 0.45 so a burst of damage doesn't black out the screen.
@@ -167,9 +182,9 @@ func show_kill(attacker_pid: int, victim_pid: int) -> void:
 		_show_kill_banner("%s KILLED YOU" % attacker_name, Color(1, 0.3, 0.3))
 
 func _show_kill_banner(text: String, color: Color) -> void:
-	kill_banner.visible = true
+	kill_banner_panel.visible = true
+	kill_banner_panel.modulate = Color(1, 1, 1, 1)
 	kill_banner.text = text
-	kill_banner.modulate = Color(1, 1, 1, 1)
 	kill_banner.add_theme_color_override("font_color", color)
 	_kill_banner_timer = KILL_BANNER_LIFETIME
 
