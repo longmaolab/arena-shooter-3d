@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/hud.tscn" id="1"]
 [ext_resource type="Script" path="res://scripts/game.gd" id="2"]
@@ -39,6 +39,10 @@ roughness = 0.7
 albedo_color = Color(0.4, 0.42, 0.55, 1)
 metallic = 0.2
 roughness = 0.6
+
+[sub_resource type="StandardMaterial3D" id="tunnel_mat"]
+albedo_color = Color(0.32, 0.30, 0.35, 1)
+roughness = 0.95
 
 [node name="Game" type="Node3D"]
 script = ExtResource("2")
@@ -116,6 +120,114 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18, 2.5, -18)
 use_collision = true
 size = Vector3(3, 5, 3)
 material = SubResource("tower_mat")
+
+[node name="BridgePillarW" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 1.5, 0)
+use_collision = true
+size = Vector3(1, 3, 3)
+material = SubResource("tower_mat")
+
+[node name="BridgePillarE" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 1.5, 0)
+use_collision = true
+size = Vector3(1, 3, 3)
+material = SubResource("tower_mat")
+
+[node name="BridgeDeck" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.25, 0)
+use_collision = true
+size = Vector3(18, 0.5, 3)
+material = SubResource("wall_mat")
+
+[node name="BridgeRailN" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.9, -1.5)
+use_collision = true
+size = Vector3(18, 0.8, 0.15)
+material = SubResource("tower_mat")
+
+[node name="BridgeRailS" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.9, 1.5)
+use_collision = true
+size = Vector3(18, 0.8, 0.15)
+material = SubResource("tower_mat")
+
+[node name="StairN1" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, -9)
+use_collision = true
+size = Vector3(4, 1, 3)
+material = SubResource("cover_mat")
+
+[node name="StairN2" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -6)
+use_collision = true
+size = Vector3(4, 2, 3)
+material = SubResource("cover_mat")
+
+[node name="StairN3" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -3)
+use_collision = true
+size = Vector3(4, 3, 3)
+material = SubResource("cover_mat")
+
+[node name="StairS1" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 9)
+use_collision = true
+size = Vector3(4, 1, 3)
+material = SubResource("cover_mat")
+
+[node name="StairS2" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 6)
+use_collision = true
+size = Vector3(4, 2, 3)
+material = SubResource("cover_mat")
+
+[node name="StairS3" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 3)
+use_collision = true
+size = Vector3(4, 3, 3)
+material = SubResource("cover_mat")
+
+[node name="TunnelInnerWall" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22, 2, 0)
+use_collision = true
+size = Vector3(1, 4, 18)
+material = SubResource("tunnel_mat")
+
+[node name="TunnelRoof" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 26, 4.25, 0)
+use_collision = true
+size = Vector3(8, 0.5, 18)
+material = SubResource("tunnel_mat")
+
+[node name="TunnelStep1" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 19, 0.75, 11)
+use_collision = true
+size = Vector3(2, 1.5, 2)
+material = SubResource("cover_mat")
+
+[node name="TunnelStep2" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 1.75, 9)
+use_collision = true
+size = Vector3(2, 3.5, 2)
+material = SubResource("cover_mat")
+
+[node name="Platform1" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -22, 0.6, 0)
+use_collision = true
+size = Vector3(3, 1.2, 3)
+material = SubResource("cover_mat")
+
+[node name="Platform2" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 1, -16)
+use_collision = true
+size = Vector3(3, 2, 3)
+material = SubResource("cover_mat")
+
+[node name="Platform3" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 1, 16)
+use_collision = true
+size = Vector3(3, 2, 3)
+material = SubResource("cover_mat")
 
 [node name="Players" type="Node3D" parent="."]
 
