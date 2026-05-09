@@ -2,20 +2,20 @@ extends Control
 
 const SKIN_COUNT := 18
 
-@onready var ip_input: LineEdit = $Center/Cols/Panel/VBox/IPInput
-@onready var status: Label = $Center/Cols/Panel/VBox/Status
-@onready var host_btn: Button = $Center/Cols/Panel/VBox/HostBtn
-@onready var join_btn: Button = $Center/Cols/Panel/VBox/JoinBtn
-@onready var name_input: LineEdit = $Center/Cols/Panel/VBox/NameInput
-@onready var skin_prev: Button = $Center/Cols/Panel/VBox/SkinPicker/PrevBtn
-@onready var skin_next: Button = $Center/Cols/Panel/VBox/SkinPicker/NextBtn
-@onready var skin_preview: TextureRect = $Center/Cols/Panel/VBox/SkinPicker/PreviewBg/Preview
-@onready var skin_name: Label = $Center/Cols/Panel/VBox/SkinName
-@onready var lb_rows: VBoxContainer = $Center/Cols/LeaderboardPanel/LBox/LBRows
-@onready var lb_empty: Label = $Center/Cols/LeaderboardPanel/LBox/LBEmpty
-@onready var bot_btn_1: Button = $Center/Cols/Panel/VBox/BotRow/Bot1
-@onready var bot_btn_2: Button = $Center/Cols/Panel/VBox/BotRow/Bot2
-@onready var bot_btn_3: Button = $Center/Cols/Panel/VBox/BotRow/Bot3
+@onready var ip_input: LineEdit = $Scroll/Center/Cols/Panel/VBox/IPInput
+@onready var status: Label = $Scroll/Center/Cols/Panel/VBox/Status
+@onready var host_btn: Button = $Scroll/Center/Cols/Panel/VBox/HostBtn
+@onready var join_btn: Button = $Scroll/Center/Cols/Panel/VBox/JoinBtn
+@onready var name_input: LineEdit = $Scroll/Center/Cols/Panel/VBox/NameInput
+@onready var skin_prev: Button = $Scroll/Center/Cols/Panel/VBox/SkinPicker/PrevBtn
+@onready var skin_next: Button = $Scroll/Center/Cols/Panel/VBox/SkinPicker/NextBtn
+@onready var skin_preview: TextureRect = $Scroll/Center/Cols/Panel/VBox/SkinPicker/PreviewBg/Preview
+@onready var skin_name: Label = $Scroll/Center/Cols/Panel/VBox/SkinName
+@onready var lb_rows: VBoxContainer = $Scroll/Center/Cols/LeaderboardPanel/LBox/LBRows
+@onready var lb_empty: Label = $Scroll/Center/Cols/LeaderboardPanel/LBox/LBEmpty
+@onready var bot_btn_1: Button = $Scroll/Center/Cols/Panel/VBox/BotRow/Bot1
+@onready var bot_btn_2: Button = $Scroll/Center/Cols/Panel/VBox/BotRow/Bot2
+@onready var bot_btn_3: Button = $Scroll/Center/Cols/Panel/VBox/BotRow/Bot3
 
 var _selected_bot_count: int = 2
 

@@ -244,22 +244,28 @@ expand_mode = 1
 stretch_mode = 6
 modulate = Color(1, 0.55, 0.85, 0.45)
 
-[node name="Center" type="CenterContainer" parent="."]
+[node name="Scroll" type="ScrollContainer" parent="."]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+horizontal_scroll_mode = 3
+vertical_scroll_mode = 1
 
-[node name="Cols" type="HBoxContainer" parent="Center"]
+[node name="Center" type="CenterContainer" parent="Scroll"]
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="Cols" type="HBoxContainer" parent="Scroll/Center"]
 theme_override_constants/separation = 28
 
-[node name="Panel" type="PanelContainer" parent="Center/Cols"]
+[node name="Panel" type="PanelContainer" parent="Scroll/Center/Cols"]
 custom_minimum_size = Vector2(460, 0)
 theme_override_styles/panel = SubResource("panel_glass")
 
-[node name="VBox" type="VBoxContainer" parent="Center/Cols/Panel"]
+[node name="VBox" type="VBoxContainer" parent="Scroll/Center/Cols/Panel"]
 theme_override_constants/separation = 12
 
-[node name="Title" type="Label" parent="Center/Cols/Panel/VBox"]
+[node name="Title" type="Label" parent="Scroll/Center/Cols/Panel/VBox"]
 text = "ARENA SHOOTER"
 horizontal_alignment = 1
 theme_override_font_sizes/font_size = 38
@@ -267,20 +273,20 @@ theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_colors/font_outline_color = Color(0.34, 0.12, 0.62, 1)
 theme_override_constants/outline_size = 6
 
-[node name="Subtitle" type="Label" parent="Center/Cols/Panel/VBox"]
+[node name="Subtitle" type="Label" parent="Scroll/Center/Cols/Panel/VBox"]
 text = "★ MULTIPLAYER  PVP  v6 ★"
 horizontal_alignment = 1
 theme_override_font_sizes/font_size = 17
 theme_override_colors/font_color = Color(1, 0.85, 0.30, 1)
 
-[node name="Sep1" type="HSeparator" parent="Center/Cols/Panel/VBox"]
+[node name="Sep1" type="HSeparator" parent="Scroll/Center/Cols/Panel/VBox"]
 
-[node name="NameLabel" type="Label" parent="Center/Cols/Panel/VBox"]
+[node name="NameLabel" type="Label" parent="Scroll/Center/Cols/Panel/VBox"]
 text = "👤  YOUR NAME"
 theme_override_font_sizes/font_size = 17
 theme_override_colors/font_color = Color(0.78, 0.80, 0.95, 1)
 
-[node name="NameInput" type="LineEdit" parent="Center/Cols/Panel/VBox"]
+[node name="NameInput" type="LineEdit" parent="Scroll/Center/Cols/Panel/VBox"]
 text = "Player"
 max_length = 16
 theme_override_font_sizes/font_size = 18
@@ -291,18 +297,18 @@ theme_override_colors/caret_color = Color(0.66, 0.45, 1, 1)
 virtual_keyboard_enabled = true
 virtual_keyboard_show_on_focus = true
 
-[node name="Sep2" type="HSeparator" parent="Center/Cols/Panel/VBox"]
+[node name="Sep2" type="HSeparator" parent="Scroll/Center/Cols/Panel/VBox"]
 
-[node name="SkinHeader" type="Label" parent="Center/Cols/Panel/VBox"]
+[node name="SkinHeader" type="Label" parent="Scroll/Center/Cols/Panel/VBox"]
 text = "🎭  PICK YOUR CHARACTER"
 theme_override_font_sizes/font_size = 17
 theme_override_colors/font_color = Color(0.78, 0.80, 0.95, 1)
 
-[node name="SkinPicker" type="HBoxContainer" parent="Center/Cols/Panel/VBox"]
+[node name="SkinPicker" type="HBoxContainer" parent="Scroll/Center/Cols/Panel/VBox"]
 alignment = 1
 theme_override_constants/separation = 14
 
-[node name="PrevBtn" type="Button" parent="Center/Cols/Panel/VBox/SkinPicker"]
+[node name="PrevBtn" type="Button" parent="Scroll/Center/Cols/Panel/VBox/SkinPicker"]
 custom_minimum_size = Vector2(64, 120)
 text = "◀"
 theme_override_font_sizes/font_size = 28
@@ -311,15 +317,15 @@ theme_override_styles/normal = SubResource("arrow_normal")
 theme_override_styles/hover = SubResource("arrow_hover")
 theme_override_styles/pressed = SubResource("arrow_pressed")
 
-[node name="PreviewBg" type="PanelContainer" parent="Center/Cols/Panel/VBox/SkinPicker"]
+[node name="PreviewBg" type="PanelContainer" parent="Scroll/Center/Cols/Panel/VBox/SkinPicker"]
 custom_minimum_size = Vector2(120, 120)
 theme_override_styles/panel = SubResource("preview_card")
 
-[node name="Preview" type="TextureRect" parent="Center/Cols/Panel/VBox/SkinPicker/PreviewBg"]
+[node name="Preview" type="TextureRect" parent="Scroll/Center/Cols/Panel/VBox/SkinPicker/PreviewBg"]
 expand_mode = 1
 stretch_mode = 5
 
-[node name="NextBtn" type="Button" parent="Center/Cols/Panel/VBox/SkinPicker"]
+[node name="NextBtn" type="Button" parent="Scroll/Center/Cols/Panel/VBox/SkinPicker"]
 custom_minimum_size = Vector2(64, 120)
 text = "▶"
 theme_override_font_sizes/font_size = 28
@@ -328,15 +334,15 @@ theme_override_styles/normal = SubResource("arrow_normal")
 theme_override_styles/hover = SubResource("arrow_hover")
 theme_override_styles/pressed = SubResource("arrow_pressed")
 
-[node name="SkinName" type="Label" parent="Center/Cols/Panel/VBox"]
+[node name="SkinName" type="Label" parent="Scroll/Center/Cols/Panel/VBox"]
 text = "Skin A  (1/18)"
 horizontal_alignment = 1
 theme_override_font_sizes/font_size = 16
 theme_override_colors/font_color = Color(1, 0.85, 0.30, 1)
 
-[node name="Sep3" type="HSeparator" parent="Center/Cols/Panel/VBox"]
+[node name="Sep3" type="HSeparator" parent="Scroll/Center/Cols/Panel/VBox"]
 
-[node name="JoinBtn" type="Button" parent="Center/Cols/Panel/VBox"]
+[node name="JoinBtn" type="Button" parent="Scroll/Center/Cols/Panel/VBox"]
 text = "▶  PLAY"
 custom_minimum_size = Vector2(0, 64)
 theme_override_font_sizes/font_size = 30
@@ -347,7 +353,7 @@ theme_override_styles/normal = SubResource("play_normal")
 theme_override_styles/hover = SubResource("play_hover")
 theme_override_styles/pressed = SubResource("play_pressed")
 
-[node name="IPInput" type="LineEdit" parent="Center/Cols/Panel/VBox"]
+[node name="IPInput" type="LineEdit" parent="Scroll/Center/Cols/Panel/VBox"]
 placeholder_text = "Server URL (auto)"
 text = ""
 theme_override_font_sizes/font_size = 12
@@ -357,7 +363,7 @@ theme_override_colors/font_color = Color(0.85, 0.85, 0.95, 1)
 virtual_keyboard_enabled = true
 virtual_keyboard_show_on_focus = true
 
-[node name="HostBtn" type="Button" parent="Center/Cols/Panel/VBox"]
+[node name="HostBtn" type="Button" parent="Scroll/Center/Cols/Panel/VBox"]
 text = "🤖 PLAY vs BOTS"
 custom_minimum_size = Vector2(0, 50)
 theme_override_font_sizes/font_size = 22
@@ -367,16 +373,16 @@ theme_override_styles/hover = SubResource("host_hover")
 theme_override_styles/pressed = SubResource("host_pressed")
 theme_override_styles/disabled = SubResource("host_normal")
 
-[node name="BotRow" type="HBoxContainer" parent="Center/Cols/Panel/VBox"]
+[node name="BotRow" type="HBoxContainer" parent="Scroll/Center/Cols/Panel/VBox"]
 alignment = 1
 theme_override_constants/separation = 10
 
-[node name="BotLabel" type="Label" parent="Center/Cols/Panel/VBox/BotRow"]
+[node name="BotLabel" type="Label" parent="Scroll/Center/Cols/Panel/VBox/BotRow"]
 text = "How many bots:"
 theme_override_font_sizes/font_size = 17
 theme_override_colors/font_color = Color(0.85, 0.85, 0.96, 1)
 
-[node name="Bot1" type="Button" parent="Center/Cols/Panel/VBox/BotRow"]
+[node name="Bot1" type="Button" parent="Scroll/Center/Cols/Panel/VBox/BotRow"]
 text = "1"
 toggle_mode = true
 button_group = SubResource("bot_group")
@@ -384,7 +390,7 @@ custom_minimum_size = Vector2(46, 40)
 theme_override_font_sizes/font_size = 22
 theme_override_colors/font_color = Color(0.92, 0.90, 1.0, 1)
 
-[node name="Bot2" type="Button" parent="Center/Cols/Panel/VBox/BotRow"]
+[node name="Bot2" type="Button" parent="Scroll/Center/Cols/Panel/VBox/BotRow"]
 text = "2"
 toggle_mode = true
 button_pressed = true
@@ -393,7 +399,7 @@ custom_minimum_size = Vector2(46, 40)
 theme_override_font_sizes/font_size = 22
 theme_override_colors/font_color = Color(0.92, 0.90, 1.0, 1)
 
-[node name="Bot3" type="Button" parent="Center/Cols/Panel/VBox/BotRow"]
+[node name="Bot3" type="Button" parent="Scroll/Center/Cols/Panel/VBox/BotRow"]
 text = "3"
 toggle_mode = true
 button_group = SubResource("bot_group")
@@ -401,29 +407,29 @@ custom_minimum_size = Vector2(46, 40)
 theme_override_font_sizes/font_size = 22
 theme_override_colors/font_color = Color(0.92, 0.90, 1.0, 1)
 
-[node name="Sep4" type="HSeparator" parent="Center/Cols/Panel/VBox"]
+[node name="Sep4" type="HSeparator" parent="Scroll/Center/Cols/Panel/VBox"]
 
-[node name="Status" type="Label" parent="Center/Cols/Panel/VBox"]
+[node name="Status" type="Label" parent="Scroll/Center/Cols/Panel/VBox"]
 text = ""
 horizontal_alignment = 1
 theme_override_font_sizes/font_size = 15
 theme_override_colors/font_color = Color(0.65, 1, 0.72, 1)
 
-[node name="Tips" type="Label" parent="Center/Cols/Panel/VBox"]
+[node name="Tips" type="Label" parent="Scroll/Center/Cols/Panel/VBox"]
 text = "PLAY = online vs friends   |   PLAY vs BOTS = single-player vs computer"
 horizontal_alignment = 1
 autowrap_mode = 2
 theme_override_font_sizes/font_size = 13
 theme_override_colors/font_color = Color(0.62, 0.62, 0.78, 1)
 
-[node name="LeaderboardPanel" type="PanelContainer" parent="Center/Cols"]
+[node name="LeaderboardPanel" type="PanelContainer" parent="Scroll/Center/Cols"]
 custom_minimum_size = Vector2(340, 540)
 theme_override_styles/panel = SubResource("lb_panel_glass")
 
-[node name="LBox" type="VBoxContainer" parent="Center/Cols/LeaderboardPanel"]
+[node name="LBox" type="VBoxContainer" parent="Scroll/Center/Cols/LeaderboardPanel"]
 theme_override_constants/separation = 8
 
-[node name="LBTitle" type="Label" parent="Center/Cols/LeaderboardPanel/LBox"]
+[node name="LBTitle" type="Label" parent="Scroll/Center/Cols/LeaderboardPanel/LBox"]
 text = "🏆  LEADERBOARD"
 horizontal_alignment = 1
 theme_override_font_sizes/font_size = 24
@@ -431,17 +437,17 @@ theme_override_colors/font_color = Color(1, 0.85, 0.30, 1)
 theme_override_colors/font_outline_color = Color(0.30, 0.10, 0.55, 1)
 theme_override_constants/outline_size = 4
 
-[node name="LBHeader" type="Label" parent="Center/Cols/LeaderboardPanel/LBox"]
+[node name="LBHeader" type="Label" parent="Scroll/Center/Cols/LeaderboardPanel/LBox"]
 text = "RANK   PLAYER          W    K    D"
 theme_override_font_sizes/font_size = 15
 theme_override_colors/font_color = Color(0.62, 0.70, 0.88, 1)
 
-[node name="LBSep" type="HSeparator" parent="Center/Cols/LeaderboardPanel/LBox"]
+[node name="LBSep" type="HSeparator" parent="Scroll/Center/Cols/LeaderboardPanel/LBox"]
 
-[node name="LBRows" type="VBoxContainer" parent="Center/Cols/LeaderboardPanel/LBox"]
+[node name="LBRows" type="VBoxContainer" parent="Scroll/Center/Cols/LeaderboardPanel/LBox"]
 theme_override_constants/separation = 6
 
-[node name="LBEmpty" type="Label" parent="Center/Cols/LeaderboardPanel/LBox"]
+[node name="LBEmpty" type="Label" parent="Scroll/Center/Cols/LeaderboardPanel/LBox"]
 text = "(play a match to fill this in)"
 horizontal_alignment = 1
 theme_override_font_sizes/font_size = 15
