@@ -53,6 +53,27 @@ var _current_skin: int = -1
 var _anim_player: AnimationPlayer = null
 var _current_anim: String = ""
 
+# Bot integration. game.gd::_do_spawn fills these in right after instancing.
+# `player_peer_id` is the *attribution* id (positive for humans, negative
+# for bots); `is_multiplayer_authority()` answers a different question
+# (who controls this body — the host for bots, the player themselves for
+# humans).
+var _is_bot: bool = false
+var player_peer_id: int = 0
+
+# Bot AI state — only meaningful when _is_bot is true and we're on the host.
+const BOT_VIEW_RANGE := 22.0
+const BOT_LOSE_RANGE := 30.0
+const BOT_FIRE_INTERVAL := 0.7
+const BOT_WANDER_BOUND := 25.0
+const BOT_ENGAGE_IDEAL := 12.0
+enum BotState { WANDER = 0, ENGAGE = 1 }
+var _bot_state: int = BotState.WANDER
+var _bot_target: Node = null
+var _bot_wander_target: Vector3 = Vector3.ZERO
+var _bot_state_time: float = 0.0
+var _bot_fire_cooldown: float = 0.0
+
 @onready var camera: Camera3D = $Camera3D
 @onready var ray: RayCast3D = $Camera3D/RayCast3D
 @onready var muzzle: MeshInstance3D = $Camera3D/MuzzleFlash
@@ -77,16 +98,27 @@ func _ready() -> void:
 func _setup_authority_visuals() -> void:
 	_game = get_tree().get_first_node_in_group("game")
 	if is_multiplayer_authority():
-		add_to_group("local_player")
-		model_holder.visible = false
-		name_label.visible = false
-		camera.current = true
-		_grab_mouse()
-		# Push initial weapon state to whoever's listening (HUD).
-		var w: Dictionary = WEAPONS[current_weapon]
-		local_weapon_changed.emit(
-			current_weapon, str(w["name"]),
-			weapon_ammo[current_weapon], int(w["max_ammo"]))
+		if _is_bot:
+			# Bot is server-controlled but not the local human; keep the body
+			# visible to everyone, including the host that's running the AI.
+			# Disable input handling — AI tick drives everything.
+			set_process_input(false)
+			set_process_unhandled_input(false)
+			# Pre-seed a wander target so the AI has somewhere to go.
+			_bot_wander_target = Vector3(
+				randf_range(-BOT_WANDER_BOUND, BOT_WANDER_BOUND), 0,
+				randf_range(-BOT_WANDER_BOUND, BOT_WANDER_BOUND))
+		else:
+			add_to_group("local_player")
+			model_holder.visible = false
+			name_label.visible = false
+			camera.current = true
+			_grab_mouse()
+			# Push initial weapon state to whoever's listening (HUD).
+			var w: Dictionary = WEAPONS[current_weapon]
+			local_weapon_changed.emit(
+				current_weapon, str(w["name"]),
+				weapon_ammo[current_weapon], int(w["max_ammo"]))
 	else:
 		camera.current = false
 		ray.enabled = false
@@ -229,9 +261,22 @@ func get_weapon_info() -> Dictionary:
 func _physics_process(delta: float) -> void:
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
+	if _is_bot:
+		_bot_tick(delta)
+	else:
+		_human_tick(delta)
+	move_and_slide()
+	_play_anim(_select_anim())
+	sync_timer -= delta
+	if sync_timer <= 0.0:
+		sync_timer = SYNC_INTERVAL
+		# Don't broadcast position from a node that's been queue_free'd this frame.
+		if is_inside_tree() and not is_queued_for_deletion():
+			_remote_state.rpc(global_position, rotation.y, camera.rotation.x, _current_anim)
+
+func _human_tick(_delta: float) -> void:
 	if Input.is_action_just_pressed("jump") and is_on_floor():
 		velocity.y = JUMP_VELOCITY
-
 	var input_dir := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var direction := (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
 	var speed := SPRINT_SPEED if Input.is_action_pressed("sprint") else SPEED
@@ -241,22 +286,111 @@ func _physics_process(delta: float) -> void:
 	else:
 		velocity.x = move_toward(velocity.x, 0.0, speed)
 		velocity.z = move_toward(velocity.z, 0.0, speed)
-
-	move_and_slide()
-
-	_play_anim(_select_anim())
-
 	if Input.is_action_pressed("shoot"):
 		_try_shoot()
 	if Input.is_action_just_pressed("reload"):
 		_reload()
 
-	sync_timer -= delta
-	if sync_timer <= 0.0:
-		sync_timer = SYNC_INTERVAL
-		# Don't broadcast position from a node that's been queue_free'd this frame.
-		if is_inside_tree() and not is_queued_for_deletion():
-			_remote_state.rpc(global_position, rotation.y, camera.rotation.x, _current_anim)
+# ─── Bot AI ──────────────────────────────────────────────────────────
+
+func _bot_tick(delta: float) -> void:
+	if health <= 0:
+		# Dead bot — server will respawn it; freeze for now.
+		velocity.x = 0
+		velocity.z = 0
+		return
+	_bot_state_time += delta
+	_bot_fire_cooldown = max(0.0, _bot_fire_cooldown - delta)
+	# Auto-reload if dry.
+	if weapon_ammo[current_weapon] <= 0 and not is_reloading:
+		_reload()
+	var nearest := _bot_find_nearest_human()
+	if _bot_state == BotState.WANDER:
+		if nearest != null and global_position.distance_to(nearest.global_position) < BOT_VIEW_RANGE:
+			_bot_state = BotState.ENGAGE
+			_bot_target = nearest
+			_bot_state_time = 0.0
+		else:
+			_bot_wander(delta)
+	else:  # ENGAGE
+		var lost := (
+			not is_instance_valid(_bot_target)
+			or int(_bot_target.health) <= 0
+			or global_position.distance_to(_bot_target.global_position) > BOT_LOSE_RANGE)
+		if lost:
+			_bot_state = BotState.WANDER
+			_bot_target = null
+			_bot_state_time = 0.0
+			_bot_wander(delta)
+		else:
+			_bot_engage(delta)
+
+func _bot_find_nearest_human() -> Node:
+	var nearest: Node = null
+	var nearest_dist: float = INF
+	for c in get_tree().get_nodes_in_group("player"):
+		if c == self:
+			continue
+		# Skip other bots and dead players.
+		if c._is_bot:
+			continue
+		if int(c.health) <= 0:
+			continue
+		var d: float = global_position.distance_to(c.global_position)
+		if d < nearest_dist:
+			nearest_dist = d
+			nearest = c
+	return nearest
+
+func _bot_wander(_delta: float) -> void:
+	if _bot_state_time > 4.0 or global_position.distance_to(_bot_wander_target) < 1.5:
+		_bot_wander_target = Vector3(
+			randf_range(-BOT_WANDER_BOUND, BOT_WANDER_BOUND), 0,
+			randf_range(-BOT_WANDER_BOUND, BOT_WANDER_BOUND))
+		_bot_state_time = 0.0
+	var to_target: Vector3 = _bot_wander_target - global_position
+	to_target.y = 0
+	if to_target.length() > 0.5:
+		var dir: Vector3 = to_target.normalized()
+		velocity.x = dir.x * SPEED
+		velocity.z = dir.z * SPEED
+		rotation.y = atan2(-dir.x, -dir.z)
+	else:
+		velocity.x = move_toward(velocity.x, 0.0, SPEED)
+		velocity.z = move_toward(velocity.z, 0.0, SPEED)
+	camera.rotation.x = 0.0  # level head while wandering
+
+func _bot_engage(_delta: float) -> void:
+	if _bot_target == null:
+		return
+	var to_t: Vector3 = _bot_target.global_position - global_position
+	var dist: float = to_t.length()
+	var dir: Vector3 = to_t.normalized()
+	# Face target.
+	rotation.y = atan2(-dir.x, -dir.z)
+	# Pitch camera toward target's head.
+	var horiz: float = Vector2(to_t.x, to_t.z).length()
+	var dy: float = (_bot_target.global_position.y + 1.5) - (global_position.y + 1.6)
+	camera.rotation.x = clamp(atan2(dy, max(horiz, 0.01)), -1.25, 1.25)
+	# Kite around BOT_ENGAGE_IDEAL distance.
+	if dist > BOT_ENGAGE_IDEAL + 3.0:
+		velocity.x = dir.x * SPEED
+		velocity.z = dir.z * SPEED
+	elif dist < BOT_ENGAGE_IDEAL - 3.0:
+		velocity.x = -dir.x * SPEED
+		velocity.z = -dir.z * SPEED
+	else:
+		velocity.x = move_toward(velocity.x, 0.0, SPEED)
+		velocity.z = move_toward(velocity.z, 0.0, SPEED)
+	# Fire if line of sight + cooldown elapsed.
+	if _bot_fire_cooldown <= 0.0 and not is_reloading and weapon_ammo[current_weapon] > 0:
+		_bot_fire_cooldown = BOT_FIRE_INTERVAL
+		ray.target_position = Vector3(0, 0, -100)
+		ray.force_raycast_update()
+		if ray.is_colliding():
+			var found := _find_player_root(ray.get_collider() as Node)
+			if found == _bot_target:
+				_try_shoot()
 
 @rpc("authority", "unreliable_ordered", "call_remote")
 func _remote_state(pos: Vector3, rot_y: float, cam_x: float, anim_name: String) -> void:
@@ -308,11 +442,12 @@ func _try_shoot() -> void:
 			if victim and victim != self:
 				hit_player = true
 				any_hit_player = true
-				var victim_peer_id: int = victim.get_multiplayer_authority()
+				var victim_pid: int = victim.player_peer_id
+				if victim_pid == 0:
+					# Fallback for any pre-bot codepath that didn't seed player_peer_id.
+					victim_pid = victim.get_multiplayer_authority()
 				var is_headshot: bool = (end_pos.y - victim.global_position.y) > 1.4
-				_game.server_report_hit.rpc_id(
-					NetworkManager.HOST_PEER_ID,
-					victim_peer_id, current_weapon, is_headshot, end_pos)
+				_report_hit(victim_pid, current_weapon, is_headshot, end_pos)
 		else:
 			end_pos = camera.global_position + (-camera.global_transform.basis.z) * 80.0
 		ends.append(end_pos)
@@ -322,10 +457,22 @@ func _try_shoot() -> void:
 
 	ray.target_position = orig_target
 	_fire_fx.rpc(start_pos, ends, hit_flags)
-	if any_hit_player:
+	if any_hit_player and not _is_bot:
 		local_hit_marker.emit()
 	await get_tree().create_timer(fire_rate).timeout
 	can_shoot = true
+
+func _report_hit(victim_pid: int, weapon_idx: int, is_headshot: bool, hit_pos: Vector3) -> void:
+	# Bots are server-controlled, so they route hits through the server-side
+	# function directly with their *bot* peer_id. Humans go through the RPC
+	# (sender id resolves them on the server).
+	if _is_bot:
+		if _game and _game.has_method("_process_hit"):
+			_game._process_hit(player_peer_id, victim_pid, weapon_idx, is_headshot, hit_pos)
+	else:
+		_game.server_report_hit.rpc_id(
+			NetworkManager.HOST_PEER_ID,
+			victim_pid, weapon_idx, is_headshot, hit_pos)
 
 @rpc("any_peer", "unreliable", "call_local")
 func _fire_fx(start: Vector3, ends: Array, hit_flags: Array) -> void:

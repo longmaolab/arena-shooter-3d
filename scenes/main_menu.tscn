@@ -364,6 +364,23 @@ theme_override_styles/hover = SubResource("host_hover")
 theme_override_styles/pressed = SubResource("host_pressed")
 theme_override_styles/disabled = SubResource("host_normal")
 
+[node name="BotRow" type="HBoxContainer" parent="Center/Cols/Panel/VBox"]
+alignment = 1
+theme_override_constants/separation = 10
+
+[node name="BotLabel" type="Label" parent="Center/Cols/Panel/VBox/BotRow"]
+text = "Bots when hosting:"
+theme_override_font_sizes/font_size = 13
+theme_override_colors/font_color = Color(0.78, 0.78, 0.94, 1)
+
+[node name="BotCount" type="SpinBox" parent="Center/Cols/Panel/VBox/BotRow"]
+min_value = 0.0
+max_value = 3.0
+step = 1.0
+value = 0.0
+custom_minimum_size = Vector2(72, 0)
+alignment = 1
+
 [node name="Sep4" type="HSeparator" parent="Center/Cols/Panel/VBox"]
 
 [node name="Status" type="Label" parent="Center/Cols/Panel/VBox"]

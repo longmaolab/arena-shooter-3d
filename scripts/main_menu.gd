@@ -13,6 +13,7 @@ const SKIN_COUNT := 18
 @onready var skin_name: Label = $Center/Cols/Panel/VBox/SkinName
 @onready var lb_rows: VBoxContainer = $Center/Cols/LeaderboardPanel/LBox/LBRows
 @onready var lb_empty: Label = $Center/Cols/LeaderboardPanel/LBox/LBEmpty
+@onready var bot_count_spin: SpinBox = $Center/Cols/Panel/VBox/BotRow/BotCount
 
 func _ready() -> void:
 	if "--server" in OS.get_cmdline_user_args():
@@ -173,6 +174,8 @@ func _on_manual_ip_changed(_new_text: String) -> void:
 func _on_host() -> void:
 	NetworkManager.save_settings()
 	status.text = "Starting server..."
+	var bot_count: int = int(bot_count_spin.value) if is_instance_valid(bot_count_spin) else 0
+	NetworkManager.desired_bot_count = bot_count
 	var err := NetworkManager.host_game()
 	if err != OK:
 		status.text = "Host failed: %s" % err

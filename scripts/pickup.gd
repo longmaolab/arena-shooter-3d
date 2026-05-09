@@ -67,10 +67,14 @@ func _on_body_entered(body: Node) -> void:
 		return
 	if not body.is_in_group("player"):
 		return
-	var pid: int = body.get_multiplayer_authority()
-	if not NetworkManager.players.has(pid):
+	# Stat lookup uses player_peer_id (the attribution tag), but RPC routing
+	# uses multiplayer authority — for bots these differ (bot.authority = 1
+	# = host, bot.player_peer_id = -1/-2/-3).
+	var stat_pid: int = body.player_peer_id if body.player_peer_id != 0 else body.get_multiplayer_authority()
+	var rpc_pid: int = body.get_multiplayer_authority()
+	if not NetworkManager.players.has(stat_pid):
 		return
-	var info: Dictionary = NetworkManager.players[pid]
+	var info: Dictionary = NetworkManager.players[stat_pid]
 	var consumed := false
 	if pickup_type == "health":
 		var cur: int = int(info.get("health", 100))
@@ -78,12 +82,10 @@ func _on_body_entered(body: Node) -> void:
 			return
 		var new_h: int = mini(100, cur + heal_amount)
 		info["health"] = new_h
-		body.notify_health_restored.rpc_id(pid, new_h)
+		body.notify_health_restored.rpc_id(rpc_pid, new_h)
 		consumed = true
 	elif pickup_type == "ammo":
-		# v6.8 just refills the (single) ammo pool; v6.9 will route through
-		# the weapon-aware refill once the per-weapon ammo arrays exist.
-		body.notify_ammo_restored.rpc_id(pid)
+		body.notify_ammo_restored.rpc_id(rpc_pid)
 		consumed = true
 	if consumed:
 		_disable_for_respawn()

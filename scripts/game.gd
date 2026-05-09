@@ -38,6 +38,7 @@ func _ready() -> void:
 
 	if NetworkManager.is_server():
 		_do_spawn(NetworkManager.HOST_PEER_ID, _random_spawn_pos())
+		_spawn_bots(NetworkManager.desired_bot_count)
 		# Push current leaderboard to host's HUD too.
 		push_leaderboard.rpc(StatsStore.get_top())
 	else:
@@ -78,7 +79,16 @@ func _do_spawn(peer_id: int, spawn_pos: Vector3) -> void:
 		return
 	var p := PLAYER_SCENE.instantiate()
 	p.name = str(peer_id)
-	p.set_multiplayer_authority(peer_id)
+	# Bots use negative peer_ids and are server-controlled, so authority
+	# must point at the host (the player_id is just an attribution tag).
+	var is_bot: bool = peer_id < 0
+	if is_bot:
+		p.set_multiplayer_authority(NetworkManager.HOST_PEER_ID)
+	else:
+		p.set_multiplayer_authority(peer_id)
+	# Player-side fields the player.gd uses to know which entity it is.
+	p.player_peer_id = peer_id
+	p._is_bot = is_bot
 	players_root.add_child(p, true)
 	p.global_position = spawn_pos
 	if NetworkManager.players.has(peer_id):
@@ -89,6 +99,22 @@ func _do_spawn(peer_id: int, spawn_pos: Vector3) -> void:
 			info.get("skin_index", 0))
 	if peer_id == multiplayer.get_unique_id():
 		local_player_spawned.emit(p)
+
+func _spawn_bots(count: int) -> void:
+	if count <= 0:
+		return
+	if not NetworkManager.is_server():
+		return
+	for i in count:
+		var bot_id := -(i + 1)  # -1, -2, -3
+		# Register in NetworkManager so the scoreboard / kill feed find them.
+		var bot_skin: int = randi() % 18
+		var bot_name := "BOT %d" % (i + 1)
+		var entry := NetworkManager._make_player_entry(bot_skin, bot_name, true)
+		NetworkManager.players[bot_id] = entry
+		NetworkManager.player_list_changed.emit()
+		NetworkManager._register_player.rpc(bot_id, entry)
+		_remote_spawn.rpc(bot_id, _random_spawn_pos())
 
 @rpc("authority", "reliable", "call_local")
 func _remote_spawn(peer_id: int, spawn_pos: Vector3) -> void:
@@ -104,15 +130,24 @@ func _remote_despawn(peer_id: int) -> void:
 
 @rpc("any_peer", "reliable", "call_local")
 func server_report_hit(victim_peer_id: int, weapon_idx: int, is_headshot: bool, hit_pos: Vector3) -> void:
-	# Server-authoritative: damage is NOT taken from the client. Both the
-	# weapon index and the headshot claim are hints — the server clamps the
-	# weapon index to a known table and re-validates the impact Y before
-	# granting bonus damage.
+	# Thin RPC wrapper that resolves the attacker from the network sender,
+	# then delegates to the shared _process_hit. Bots bypass this entirely
+	# by calling _process_hit directly with their own bot peer_id.
 	if not NetworkManager.is_server() or game_over:
 		return
 	var attacker_peer_id := multiplayer.get_remote_sender_id()
 	if attacker_peer_id == 0:
+		# Local call from the host's human player.
 		attacker_peer_id = NetworkManager.HOST_PEER_ID
+	_process_hit(attacker_peer_id, victim_peer_id, weapon_idx, is_headshot, hit_pos)
+
+func _process_hit(attacker_peer_id: int, victim_peer_id: int, weapon_idx: int, is_headshot: bool, hit_pos: Vector3) -> void:
+	# Server-authoritative: damage is NOT taken from the client. Both the
+	# weapon index and the headshot claim are hints — we clamp the weapon
+	# index to a known table and re-validate the impact Y before granting
+	# bonus damage.
+	if not NetworkManager.is_server() or game_over:
+		return
 	if attacker_peer_id == victim_peer_id:
 		return
 	if not NetworkManager.players.has(attacker_peer_id):
@@ -142,8 +177,11 @@ func server_report_hit(victim_peer_id: int, weapon_idx: int, is_headshot: bool, 
 	var new_health: int = max(0, current_health - damage)
 	victim_info["health"] = new_health
 	if victim_node and is_instance_valid(victim_node) and not victim_node.is_queued_for_deletion():
+		# Route via multiplayer authority — for bots that's the host (positive
+		# id), not the bot's negative attribution id which isn't a real peer.
+		var rpc_target: int = victim_node.get_multiplayer_authority()
 		victim_node.take_damage_remote.rpc_id(
-			victim_peer_id, new_health, damage, attacker_peer_id)
+			rpc_target, new_health, damage, attacker_peer_id)
 	# Floating damage number visible to everyone (the shooter cares most, but
 	# bystanders can see when their teammate is being chunked).
 	spawn_damage_number.rpc(hit_pos, damage, validated_headshot)
@@ -212,8 +250,18 @@ func _handle_kill(attacker_peer_id: int, victim_peer_id: int) -> void:
 	if victim_info:
 		victim_info["health"] = SERVER_MAX_HEALTH
 		victim_info["invincible"] = true
-	respawn_player.rpc_id(victim_peer_id, _random_spawn_pos())
+	_respawn_player(victim_peer_id, _random_spawn_pos())
 	_clear_invincibility(victim_peer_id)
+
+func _respawn_player(peer_id: int, pos: Vector3) -> void:
+	# Bots respawn server-side directly (no RPC); humans get the existing
+	# respawn_player RPC which expects the receiver to know which player is
+	# theirs via multiplayer.get_unique_id().
+	var node := get_player_node(peer_id)
+	if node and node._is_bot:
+		node.respawn_at(pos)
+		return
+	respawn_player.rpc_id(peer_id, pos)
 
 func _clear_invincibility(peer_id: int) -> void:
 	await get_tree().create_timer(SERVER_RESPAWN_INVINCIBILITY).timeout
@@ -275,7 +323,7 @@ func _start_new_game() -> void:
 			NetworkManager.players[pid]["health"] = SERVER_MAX_HEALTH
 			NetworkManager.players[pid]["invincible"] = false
 			NetworkManager.players[pid]["streak"] = 0
-			respawn_player.rpc_id(pid, _random_spawn_pos())
+			_respawn_player(pid, _random_spawn_pos())
 
 # ─── Helpers ─────────────────────────────────────────────────────────
 

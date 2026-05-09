@@ -41,6 +41,10 @@ var local_skin_index: int = 0
 # leaderboard). Empty falls back to auto "Player N".
 var local_player_name: String = "Player"
 
+# Number of bots the host requested in the main menu (0–3). Read by game.gd
+# right after the host scene loads to spawn server-controlled opponents.
+var desired_bot_count: int = 0
+
 const SETTINGS_FILE := "user://settings.cfg"
 const SKIN_COUNT := 18
 const COMMON_NAMES := [
@@ -144,7 +148,7 @@ func _wire_signals() -> void:
 	if not multiplayer.server_disconnected.is_connected(_on_server_disconnected):
 		multiplayer.server_disconnected.connect(_on_server_disconnected)
 
-func _make_player_entry(skin_index: int = 0, display_name: String = "") -> Dictionary:
+func _make_player_entry(skin_index: int = 0, display_name: String = "", is_bot: bool = false) -> Dictionary:
 	_next_player_index += 1
 	var resolved_name: String = display_name if display_name != "" else "Player %d" % _next_player_index
 	return {
@@ -159,6 +163,7 @@ func _make_player_entry(skin_index: int = 0, display_name: String = "") -> Dicti
 		"invincible": false,
 		# Consecutive kills without dying — drives the streak announcer.
 		"streak": 0,
+		"is_bot": is_bot,
 	}
 
 func _on_peer_connected(peer_id: int) -> void:
