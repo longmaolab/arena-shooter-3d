@@ -27,6 +27,8 @@ var game_over: bool = false
 
 func _ready() -> void:
 	add_to_group("game")
+	# Seed the PRNG so the spawn-point picks aren't identical run-to-run.
+	randomize()
 	if NetworkManager.is_dedicated:
 		hud.queue_free()
 		var tc := get_node_or_null("TouchControls")
@@ -328,11 +330,36 @@ func _start_new_game() -> void:
 # ─── Helpers ─────────────────────────────────────────────────────────
 
 func _random_spawn_pos() -> Vector3:
+	# Score each spawn point by distance to the closest other player and
+	# pick randomly from the top half. That avoids "respawn-and-die-again"
+	# right next to the same enemy that just killed you, but keeps enough
+	# randomness that you don't always spawn in the exact same corner.
 	var pts := spawn_points.get_children()
 	if pts.is_empty():
 		return Vector3(0, 2, 0)
-	var p: Node3D = pts[randi() % pts.size()]
-	return p.global_position
+	# Threats = every player still in the scene with HP > 0. Includes the
+	# victim's old death location, so the new spawn is far from where they
+	# just got killed.
+	var threats: Array = []
+	for child in players_root.get_children():
+		if int(child.health) <= 0:
+			continue
+		threats.append(child.global_position)
+	if threats.is_empty():
+		return pts[randi() % pts.size()].global_position
+	var scored: Array = []
+	for pt in pts:
+		var pt_pos: Vector3 = pt.global_position
+		var min_d: float = INF
+		for tp in threats:
+			var d: float = pt_pos.distance_to(tp)
+			if d < min_d:
+				min_d = d
+		scored.append({"pt": pt_pos, "safety": min_d})
+	scored.sort_custom(func(a, b): return a["safety"] > b["safety"])
+	# Random from top half — safe but still varies between deaths.
+	var pool_n: int = maxi(1, scored.size() / 2)
+	return scored[randi() % pool_n]["pt"]
 
 func get_player_node(peer_id: int) -> Node:
 	return players_root.get_node_or_null(str(peer_id))
