@@ -246,42 +246,22 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.15, -20)
 script = ExtResource("4")
 
 [node name="HP1" type="Area3D" parent="Pickups"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -20, 0.7, 0)
-script = ExtResource("5")
-pickup_type = "health"
-
-[node name="HP2" type="Area3D" parent="Pickups"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 0.7, 0)
-script = ExtResource("5")
-pickup_type = "health"
-
-[node name="HP3" type="Area3D" parent="Pickups"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.0, 0)
 script = ExtResource("5")
 pickup_type = "health"
 
-[node name="HP4" type="Area3D" parent="Pickups"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 0.7, 20)
+[node name="HP2" type="Area3D" parent="Pickups"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -22, 0.7, 18)
 script = ExtResource("5")
 pickup_type = "health"
 
 [node name="AM1" type="Area3D" parent="Pickups"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 0.7, -15)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 26, 0.7, 0)
 script = ExtResource("5")
 pickup_type = "ammo"
 
 [node name="AM2" type="Area3D" parent="Pickups"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 0.7, -15)
-script = ExtResource("5")
-pickup_type = "ammo"
-
-[node name="AM3" type="Area3D" parent="Pickups"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 0.7, 15)
-script = ExtResource("5")
-pickup_type = "ammo"
-
-[node name="AM4" type="Area3D" parent="Pickups"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 26, 0.7, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22, 0.7, -18)
 script = ExtResource("5")
 pickup_type = "ammo"
 
