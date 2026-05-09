@@ -48,16 +48,14 @@ func _ready() -> void:
 	_render_leaderboard(StatsStore.cached_leaderboard)
 
 	if OS.has_feature("web"):
-		host_btn.disabled = true
-		host_btn.text = "Host (desktop only)"
-		# Default URL is now baked in (NetworkManager.default_server_url),
-		# so Join is always usable. We still try to fetch server.json as a
-		# soft override, but a failure no longer blocks gameplay.
+		# Web: PLAY = join the public server, PLAY vs BOTS = offline single
+		# player (browsers can't bind a real server socket, so host_game
+		# falls back to OfflineMultiplayerPeer in that case).
 		ip_input.text = NetworkManager.default_server_url
-		status.text = "Press Join to connect"
+		status.text = "PLAY = online    PLAY vs BOTS = single-player"
 		_load_default_server_url()
 	else:
-		status.text = "Pick Host or Join"
+		status.text = "PLAY = join LAN    PLAY vs BOTS = single-player"
 
 func _on_name_changed(new_text: String) -> void:
 	NetworkManager.local_player_name = new_text.strip_edges()

@@ -76,11 +76,19 @@ func save_settings() -> void:
 func is_server() -> bool:
 	return multiplayer.multiplayer_peer != null and multiplayer.is_server()
 
-# Local 2-window testing host (also spawns a host player).
+# Host a match. On native builds this binds a real WebSocket server (so
+# friends on LAN can join). On web (browser) we can't bind a socket, so
+# we fall back to Godot's OfflineMultiplayerPeer — same multiplayer API
+# surface, but no networking. The kid's PLAY vs BOTS button works on
+# both platforms.
 func host_game() -> int:
-	var err := _create_server()
-	if err != OK:
-		return err
+	if OS.has_feature("web"):
+		multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
+		_wire_signals()
+	else:
+		var err := _create_server()
+		if err != OK:
+			return err
 	players[HOST_PEER_ID] = _make_player_entry(local_skin_index, local_player_name)
 	get_tree().change_scene_to_file(GAME_SCENE)
 	return OK
