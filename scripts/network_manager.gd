@@ -32,7 +32,7 @@ var is_dedicated: bool = false
 # Default server URL — production tunnel address baked in so Join works
 # even if server.json fetch fails (browser cache, offline, etc.).
 # server.json is now a soft override, useful when you change tunnels.
-var default_server_url: String = "wss://game.boobank.com"
+var default_server_url: String = "wss://game.boobank.com/arena-shooter/ws"
 
 # The skin the local player picked in the main menu (0..17 → character-a..r).
 var local_skin_index: int = 0

@@ -166,8 +166,11 @@ func _disable_for_respawn() -> void:
 
 @rpc("authority", "reliable", "call_local")
 func set_pickup_visible(v: bool) -> void:
+	# `monitoring` and CollisionShape3D.disabled can't be mutated synchronously
+	# while the physics server is flushing area queries (which is exactly when
+	# our body_entered signal fires). Defer the change to the end of the frame.
 	visible = v
-	monitoring = v
+	set_deferred("monitoring", v)
 	var col := get_node_or_null("CollisionShape3D") as CollisionShape3D
 	if col:
-		col.disabled = not v
+		col.set_deferred("disabled", not v)

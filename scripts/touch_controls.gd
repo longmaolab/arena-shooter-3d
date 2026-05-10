@@ -291,8 +291,10 @@ func _draw_button(rect: Rect2, label: String, base_color: Color, pressed: bool) 
 	draw_circle(center, r, fill)
 	# Outline ring
 	draw_arc(center, r, 0, TAU, 48, Color(1, 1, 1, 0.7 if pressed else 0.35), 2.5, true)
-	# Label
-	var font: Font = ThemeDB.fallback_font
+	# Label — pull from project / scene theme so the font face stays in
+	# sync with the rest of the UI (Russo One arcade sans). Falls back to
+	# the engine default if no theme is configured.
+	var font: Font = get_theme_default_font()
 	var font_size: int = int(rect.size.x * 0.22)
 	var text_size := font.get_string_size(label, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size)
 	var label_color := Color(1, 1, 1, 1.0) if pressed else Color(1, 1, 1, 0.9)

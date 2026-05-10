@@ -57,6 +57,12 @@ func _ready() -> void:
 		ip_input.text = NetworkManager.default_server_url
 		status.text = "PLAY = online    PLAY vs BOTS = single-player"
 		_load_default_server_url()
+	elif OS.has_feature("editor"):
+		# Editor debug (e.g. ⌘+B with two instances). Pre-fill the IP with
+		# the loopback so Window 2 can hit PLAY immediately to join Window
+		# 1's local host. Saves the kid from typing every time.
+		ip_input.text = "ws://127.0.0.1:%d" % NetworkManager.PORT
+		status.text = "W1: PLAY vs BOTS  →  W2: PLAY  (auto LAN)"
 	else:
 		status.text = "PLAY = join LAN    PLAY vs BOTS = single-player"
 
@@ -68,10 +74,10 @@ func _apply_mobile_ui_scale() -> void:
 	var win := get_window()
 	if win == null:
 		return
-	var size := get_viewport().get_visible_rect().size
+	var vp_size := get_viewport().get_visible_rect().size
 	# Pick a scale that targets roughly 720 logical px tall, regardless of
 	# physical viewport. Capped so desktop doesn't get gigantic chrome.
-	var s: float = clamp(720.0 / max(size.y, 1.0), 1.0, 1.8)
+	var s: float = clamp(720.0 / max(vp_size.y, 1.0), 1.0, 1.8)
 	# Touch devices need a small extra bump — fingers need bigger hit
 	# targets than a mouse cursor.
 	var is_touch := DisplayServer.is_touchscreen_available() \
