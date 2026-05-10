@@ -97,6 +97,13 @@ func _ready() -> void:
 
 func _setup_authority_visuals() -> void:
 	_game = get_tree().get_first_node_in_group("game")
+	# Hold off on broadcasting _remote_state for ~1.5 s after spawn. A late-
+	# joining peer's game scene hasn't loaded yet, and continuous 20 Hz state
+	# RPCs would otherwise spam "Node not found: Game/Players/N" errors on
+	# their console for several frames. By the time the grace window ends,
+	# the host's _client_ready handler has already replied with the
+	# _remote_spawn RPCs that create our peer node on every client.
+	sync_timer = 1.5
 	if is_multiplayer_authority():
 		if _is_bot:
 			# Bot is server-controlled but not the local human; keep the body
@@ -248,6 +255,11 @@ func switch_weapon(idx: int) -> void:
 	local_weapon_changed.emit(
 		idx, str(w["name"]), weapon_ammo[idx], int(w["max_ammo"]))
 	local_ammo_changed.emit(weapon_ammo[idx])
+
+func pause_state_broadcast(seconds: float) -> void:
+	# Called by game.gd when a new peer joins, so we don't fire _remote_state
+	# RPCs at a path the new peer hasn't created yet.
+	sync_timer = maxf(sync_timer, seconds)
 
 func get_weapon_info() -> Dictionary:
 	var w: Dictionary = WEAPONS[current_weapon]

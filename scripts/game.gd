@@ -9,6 +9,9 @@ const PLAYER_SCENE := preload("res://scenes/player.tscn")
 # Server-authoritative combat constants. Damage is NOT trusted from clients.
 const SERVER_MAX_HEALTH := 100
 const SERVER_RESPAWN_INVINCIBILITY := 1.5
+# How long the player stays dead before being teleported to a new spawn.
+# Gives them a beat to read the kill banner / death screen.
+const SERVER_RESPAWN_DELAY := 2.5
 # Mirror of player.gd::WEAPONS but only the damage columns the server cares
 # about. Index matches the player-side WEAPONS array (0=PISTOL, 1=SMG, 2=SHOTGUN).
 # Shotgun "body"/"head" are *per pellet* — five pellets all landing means
@@ -68,6 +71,12 @@ func _client_ready(skin_index: int, player_name: String) -> void:
 		if existing:
 			_remote_spawn.rpc_id(new_peer_id, pid, existing.global_position)
 	_remote_spawn.rpc(new_peer_id, _random_spawn_pos())
+	# Briefly pause every existing player's state broadcast so the new
+	# client has a moment to instantiate the spawned nodes before any
+	# 20 Hz _remote_state RPC tries to address them by path.
+	for child in players_root.get_children():
+		if child.has_method("pause_state_broadcast"):
+			child.pause_state_broadcast(0.4)
 	# Send the new client the current leaderboard.
 	push_leaderboard.rpc_id(new_peer_id, StatsStore.get_top())
 
@@ -248,6 +257,19 @@ func _handle_kill(attacker_peer_id: int, victim_peer_id: int) -> void:
 		_schedule_new_game()
 		return
 
+	# Hold the player dead for a beat so the death overlay + kill banner
+	# actually register before they teleport away. Health stays 0 in the
+	# server dict during the wait, so any in-flight hits are filtered out
+	# by the existing "current_health <= 0" guard in _process_hit.
+	await get_tree().create_timer(SERVER_RESPAWN_DELAY).timeout
+	# Player may have left, the match may have ended, or someone may have
+	# kicked us back to the menu while we were waiting — bail in any of
+	# those cases.
+	if not is_inside_tree() or game_over:
+		return
+	if not NetworkManager.players.has(victim_peer_id):
+		return
+
 	# Server-driven respawn with invincibility window.
 	if victim_info:
 		victim_info["health"] = SERVER_MAX_HEALTH
@@ -358,6 +380,7 @@ func _random_spawn_pos() -> Vector3:
 		scored.append({"pt": pt_pos, "safety": min_d})
 	scored.sort_custom(func(a, b): return a["safety"] > b["safety"])
 	# Random from top half — safe but still varies between deaths.
+	@warning_ignore("integer_division")
 	var pool_n: int = maxi(1, scored.size() / 2)
 	return scored[randi() % pool_n]["pt"]
 
