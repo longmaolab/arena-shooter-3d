@@ -41,10 +41,15 @@ echo ""
 echo "→ 推送到 GitHub..."
 git push
 
-# ---- 4. 触发服务器 pull + 重启 game server ----
+# ---- 4. 触发服务器 pull + 重新导入资源 + 重启 game server ----
+# `godot --import` 把新加的字体/贴图/模型生成 .godot/imported/ 缓存。
+# 不跑这一步的话,新资源会在 arena-game 启动时报 "Cannot open file" 错。
 echo ""
-echo "→ 通知服务器拉取并重启 ..."
-ssh "$SERVER_HOST" "cd '$SERVER_PATH' && git pull --rebase && systemctl restart arena-game"
+echo "→ 通知服务器拉取、import、重启 ..."
+ssh "$SERVER_HOST" "cd '$SERVER_PATH' \
+  && git pull --rebase \
+  && godot --headless --path . --import 2>&1 | tail -3 \
+  && systemctl restart arena-game"
 
 # ---- 5. done ----
 echo ""
