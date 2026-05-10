@@ -6,69 +6,92 @@
 
 ## 🎮 第 1 部分：怎么玩
 
-### 玩家进入游戏
+### 控制键
 
-| 设备 | 移动 | 视角 | 跳跃 | 射击 | 换弹 |
-|---|---|---|---|---|---|
-| 电脑 | W / A / S / D | 鼠标 | 空格 | 鼠标左键 | R |
-| 手机 | 左下虚拟摇杆 | 右半边屏幕滑动 | JUMP 按钮 | FIRE 按钮 | RELOAD 按钮 |
+| 设备 | 移动 | 视角 | 跳跃 | 射击 | 换弹 | 切武器 |
+|---|---|---|---|---|---|---|
+| 电脑 | W / A / S / D | 鼠标 | 空格 | 鼠标左键 | R | **数字键 1 / 2 / 3** |
+| 手机 | 左下虚拟摇杆 | 右半屏滑动 | JUMP 按钮 | FIRE 按钮 | RELOAD 按钮 | PIS / SMG / SHG 三个小键 |
+
+### 主菜单两个绿/紫按钮
+
+- **▶ PLAY**（绿色）—— 上线对战，连远程服务器跟朋友打
+- **🤖 PLAY vs BOTS**（紫色）—— 选 1 / 2 / 3 个 bot 单机练习
+  - 网页版：纯本地，不联网也能玩
+  - 桌面版：本机当 LAN host，朋友也能加进来
 
 ### 游戏规则
 
-- **目标**：先打到 **10 杀** 的玩家获胜
-- **死了会怎样**：原地爆开 → 黑屏 1.5 秒 → 在随机出生点复活，无敌 1.5 秒
-- **每局结束后**：5 秒倒计时 → 自动开下一局，分数清零
-- **看排行榜**：右上角是本场积分，右下角是总历史排行（爸爸 Mac 上保存）
+- **赢的条件**：第一个杀到 **10 个**人/bot 的赢
+- **死了会怎样**：黑屏 → **等 2.5 秒** → 传送到离敌人最远的出生点 → 无敌 1.5 秒（小人闪烁）
+- **每局结束后**：屏幕中央倒计时 5 秒 → 自动开下一局，分数清零
 
-### 主菜单的两栏
+### 三把武器（数字键 1 / 2 / 3 切换）
 
-- **左栏**：输入名字、选角色（< / > 翻页，18 个 Kenney 小人）、Host/Join 按钮
-- **右栏**：历史排行榜（按胜场排序）
+| 键 | 武器 | 伤害（普通 / 爆头） | 弹夹 | 射速 | 适合 |
+|---|---|---|---|---|---|
+| 1 | 🔫 **手枪** | 50 / 100 | 12 | 慢 | 远距离精准、爆头一枪秒 |
+| 2 | 💨 **SMG**（默认） | 25 / 50 | 30 | 快 | 中距离扫射 |
+| 3 | 💥 **霰弹** | 18 / 36 × 5 颗弹丸 | 8 | 极慢 | 贴身一发 90 伤 |
+
+> 💡 **爆头判定**：准心瞄到敌人**头部**时打中，伤害 ×2，屏幕中央会冒红字 "HEAD! -50"。
+
+### 地图道具（**找它们！**）
+
+- 🚀 **跳板**（青蓝色发光圆盘 ×3）—— 踩上去弹起 5 米，能从地面直接跳到桥上
+- ❤️ **血包**（白色发光盒 + 红十字 ×2）—— 走过去回血 +50（桥面正中一个、西南角一个）
+- 🔫 **弹药箱**（金色发光木箱 ×2）—— 走过去满弹（隧道里一个、东北角一个）
+- 道具被拿走后**消失 30 秒**，然后自动复活
+
+### 连击播报 🔥
+
+不死的情况下连续杀人，屏幕中央会闪：
+
+| 连杀 | 显示 | 颜色 |
+|---|---|---|
+| 2 | 🔥 DOUBLE KILL | 黄 |
+| 3 | 🔥 TRIPLE KILL | 橙 |
+| 5 | 🔥 RAMPAGE | 红 |
+| 7 | 🔥 GODLIKE | 紫 |
+
+死一次清零，继续刷。
+
+### 排行榜
+
+- **游戏中右上角**：本局当前所有玩家的 K / D
+- **菜单右栏**：历史总排名（按胜场排序，永久存档）
 
 > 第一次启动会自动给你一个英文随机名字 + 随机角色。改过之后下次会记住。
 
 ---
 
-## 🚀 第 2 部分：让朋友也能玩（爸爸 Mac 上做）
+## 🚀 第 2 部分：让朋友也能玩
 
-每次想和朋友玩，都要这两步。**两个终端窗口都要保持开着，玩完才关。**
+**好消息：服务器在 VPS 上 24 小时在线，你和爸爸什么都不用做**。直接把链接发给朋友：
 
-### 步骤 ① 开服务器
+```
+https://game.boobank.com/arena-shooter/
+```
 
-打开一个终端：
+朋友打开 → 选角色 → 点 **PLAY** → 自动连接！
+
+### 想单人玩 vs Bot（不联网）
+
+直接打开同一个链接，点紫色的 **PLAY vs BOTS**，选 1/2/3 个 bot，开打。这个不需要服务器，朋友的 wifi 不好也能玩。
+
+### 服务器维护命令（爸爸偶尔用）
+
+如果朋友说"连不上"，让爸爸 SSH 上 VPS 看：
 
 ```bash
-cd /Users/longmao/projects/arena-shooter-3d
-./run_server.sh
+ssh root@207.148.98.206 'systemctl is-active arena-game caddy cloudflared'
+# 三个都应该是 active
+
+ssh root@207.148.98.206 'journalctl -u arena-game -n 30 --no-pager'
+# 看最近的游戏服务器日志
 ```
 
-看到 `[server] listening on port 7777` 就是成功了。
-
-### 步骤 ② 开 Cloudflare 隧道
-
-再开一个终端：
-
-```bash
-cloudflared tunnel run arena-shooter
-```
-
-看到 `Registered tunnel connection` 就是成功了。
-
-### 步骤 ③ 把链接发给朋友
-
-```
-https://longmaolab.github.io/arena-shooter-3d/
-```
-
-朋友打开 → 选角色 → 点 **Join** → 自动连接！
-
-### 玩完了想关掉
-
-每个终端按一次 `Ctrl + C` 就行。或者一行命令同时关：
-
-```bash
-pkill -f "Godot.*--server" && pkill -x cloudflared
-```
+详细运维命令在 [`OPERATIONS.md`](OPERATIONS.md)。
 
 ---
 
@@ -84,31 +107,43 @@ pkill -f "Godot.*--server" && pkill -x cloudflared
 
 - 顶部菜单 **调试 → 运行多个实例 → 2**（这样能开两个窗口模拟两个玩家）
 - 按 **⌘ + B** 启动两个窗口
-- 窗口 1 选角色 → Host
-- 窗口 2 选角色 → Join（IP 默认 127.0.0.1）
+- 窗口 1：选角色 → 点 **🤖 PLAY vs BOTS**（变本机 host）
+- 窗口 2：直接点 **▶ PLAY**（IP 框已自动填 `ws://127.0.0.1:7777`）
 
 ### 常见的小修改清单
 
 | 想改什么 | 打开哪个文件 | 改哪一行 |
 |---|---|---|
-| 跑步速度 | `scripts/player.gd` | `const SPEED := 6.0` |
-| 冲刺速度 | `scripts/player.gd` | `const SPRINT_SPEED := 10.0` |
-| 跳跃高度 | `scripts/player.gd` | `const JUMP_VELOCITY := 7.0` |
-| 满血量（服务器权威） | `scripts/game.gd` | `const SERVER_MAX_HEALTH := 100` |
-| 子弹伤害（服务器权威） | `scripts/game.gd` | `const SERVER_BULLET_DAMAGE := 25` |
-| 复活无敌时长 | `scripts/game.gd` | `const SERVER_RESPAWN_INVINCIBILITY := 1.5` |
-| 满弹夹 | `scripts/player.gd` | `const MAX_AMMO := 30` |
-| 换弹时间 | `scripts/player.gd` | `const RELOAD_TIME := 1.4` |
-| 多少杀算赢 | `scripts/game.gd` | `const KILLS_TO_WIN := 10` |
-| 新一局等多久 | `scripts/game.gd` | `const NEW_GAME_DELAY := 5.0` |
-| 最多几个玩家 | `scripts/network_manager.gd` | `const MAX_PLAYERS := 8` |
-| 默认随机名字列表 | `scripts/network_manager.gd` | `const COMMON_NAMES := [...]` |
+| **跑步速度** | `scripts/player.gd` | `const SPEED := 6.0` |
+| **冲刺速度** | `scripts/player.gd` | `const SPRINT_SPEED := 10.0` |
+| **跳跃高度** | `scripts/player.gd` | `const JUMP_VELOCITY := 8.5` |
+| **跳板弹起多高** | `scripts/jump_pad.gd` | `const JUMP_BOOST := 16.0` |
+| **满血量** | `scripts/game.gd` | `const SERVER_MAX_HEALTH := 100` |
+| **三把武器属性**（伤害 / 弹夹 / 射速 / 散布） | `scripts/player.gd` | `const WEAPONS := [...]` |
+| **服务器伤害表**（爆头 / 普通） | `scripts/game.gd` | `const SERVER_WEAPON_DAMAGE := [...]` |
+| **死后等多久复活** | `scripts/game.gd` | `const SERVER_RESPAWN_DELAY := 2.5` |
+| **复活无敌时长** | `scripts/game.gd` | `const SERVER_RESPAWN_INVINCIBILITY := 1.5` |
+| **多少杀算赢** | `scripts/game.gd` | `const KILLS_TO_WIN := 10` |
+| **新一局等多久** | `scripts/game.gd` | `const NEW_GAME_DELAY := 5.0` |
+| **Bot 视野距离 / 开火间隔** | `scripts/player.gd` | `const BOT_VIEW_RANGE := 22.0` 等 |
+| **连击播报阈值** | `scripts/game.gd` 的 `_handle_kill` | `if streak == 2 or 3 or 5 or 7:` |
+| **血包加多少血** | `scripts/pickup.gd` | `@export var heal_amount: int = 50` |
+| **道具复活时间** | `scripts/pickup.gd` | `@export var respawn_time: float = 30.0` |
+| **最多几个玩家** | `scripts/network_manager.gd` | `const MAX_PLAYERS := 8` |
+| **默认随机名字列表** | `scripts/network_manager.gd` | `const COMMON_NAMES := [...]` |
 
 ### 改地图
 
 - 在 Godot 编辑器里打开 `scenes/game.tscn`
-- 场景树里找 `Arena` 节点下面的 `CSGBox3D` 们
-- 拖动它们的位置 / 大小，就能改墙、改地形
+- 场景树里找 `Game` 下面的 CSGBox3D 们（Floor、Wall_、Cover_、Tower_、Bridge_、Stair_、Tunnel_、Platform_）—— 拖位置和 `size` 改墙、桥、阶梯
+- `Pickups` 节点下面是 8 个道具（HP_/ AM_/ JumpPad_）—— 拖位置改它们出现的地方
+- `SpawnPoints` 节点下面是 6 个 Marker3D —— 拖它们改玩家出生位置
+
+### 加 / 删 bot 默认数
+
+主菜单的 1 / 2 / 3 按钮就是选数量。如果想让默认是 3 不是 2：
+
+- `scenes/main_menu.tscn` 找 `Bot2` 节点 → 把 `button_pressed = true` 拷给 `Bot3`，从 `Bot2` 删掉
 
 ---
 
@@ -152,35 +187,47 @@ git push
 
 ## 🐛 第 5 部分：常见问题
 
-### Q1：朋友打开网页，点 Join 没反应
-- 先确认你 Mac 上的两个终端（服务器 + 隧道）还在跑
-- 隧道终端有没有 `Registered tunnel connection`？没有的话再开一次
+### Q1：朋友打开网页，点 PLAY 没反应 / "Connection failed"
+- 服务器在 VPS 上 24 小时跑，朋友能不能进取决于 VPS 服务有没有挂
+- 让爸爸 SSH 上去看：`ssh root@207.148.98.206 'systemctl is-active arena-game caddy cloudflared'`
+- 三个都应该是 `active`。哪个不是就重启它：`ssh root@207.148.98.206 'systemctl restart arena-game'`
+- 同时朋友可以**先点紫色 PLAY vs BOTS 单机玩**，等服务器修好再上线
 
-### Q2：自己开两个窗口测试，第二个 Join 报错
-- 第一个窗口必须先点 **Host**，再开第二个
-- 第二个窗口的 IP 框里填 `127.0.0.1`（默认就是这个）
+### Q2：自己开两个窗口测试，第二个 PLAY 报错
+- 第一个窗口必须先点 **🤖 PLAY vs BOTS**（变成本机 host）
+- 第二个窗口的 IP 框已经自动填了 `ws://127.0.0.1:7777`，**直接点 PLAY 就行**
+- 如果 IP 框被你改过了，把它改回 `ws://127.0.0.1:7777`
 
 ### Q3：浏览器里中文显示成方块
 - Godot Web 导出不带中文字体，所以菜单里全用英文
-- 改菜单文字时记得只用英文 / 数字 / 符号
+- 改菜单文字时记得只用英文 / 数字 / 符号 / emoji
 
-### Q4：开服务器报错 `port already in use`
-- 上次的服务器没关干净
-- `run_server.sh` 已经会自动清理，再跑一遍就行
-- 万一不行：`pkill -f "Godot.*--server"`
+### Q4：编辑器里报一堆 "Node not found: Game/Players/N"
+- 这是窗口 2 的 game 场景没加载完时窗口 1 已经在广播位置 → 已经在 v6.17 修了：每个 player 头 1.5 秒不广播
+- 还看到几条？正常，第一帧的少量错误不影响游戏
 
 ### Q5：子弹打不中人
-- 这是已修过的 bug：Kenney 角色身体每个部位（手 / 脚 / 头）都有自己的碰撞体，子弹要沿父节点找到主角色才算命中
+- v6.6 修过：Kenney 角色每个肢体（手/脚/头）都有自己的碰撞体，子弹要沿父节点找到主角色才算命中
 - 修复在 `scripts/player.gd` 的 `_find_player_root()` 函数
+- 现在还有**爆头判定**：打到 Y > 1.4m 区域就 ×2 伤害
 
-### Q6：在 Godot 里改了文件，但游戏里没生效
+### Q6：Bot 太厉害打不过 / 太傻没挑战
+- 视野太大让你被远距离秒：改 `player.gd::BOT_VIEW_RANGE`（默认 22m，调成 12m 就成"近视眼"）
+- 开火太快：`BOT_FIRE_INTERVAL` 默认 0.7 秒，调到 1.5 让他慢点
+- 永远缠着你：`BOT_LOSE_RANGE` 默认 30m，调小让他更容易"放弃追"
+
+### Q7：在 Godot 里改了文件，但游戏里没生效
 - 文件保存了吗？（标题栏有 `*` 表示没存）
 - 试试 **项目 → 重新加载当前项目**
 - 如果还不行，关掉 Godot 重新打开
 
-### Q7：手机上键盘弹不出来
+### Q8：手机上键盘弹不出来
 - 已经修过：项目设置里开了 `virtual_keyboard_enabled`
 - 名字输入框点击之后应该会弹
+
+### Q9：朋友在网页版看到的是旧版本
+- 浏览器缓存了老 pck。让他**硬刷新**：⌘+Shift+R（Mac）或 Ctrl+Shift+R（Win）
+- 或者关闭整个标签页重开
 
 ---
 
@@ -191,44 +238,52 @@ arena-shooter-3d/
 ├── project.godot              ← 用 Godot 打开这个文件
 ├── README.md                  ← 给开发者看的总文档
 ├── KIDS_GUIDE.md              ← 你正在看的这份
-├── SERVER_GUIDE.md            ← Cloudflare 隧道详细搭建步骤
-├── run_server.sh              ← 启动服务器脚本
-├── deploy.sh                  ← 部署到 GitHub Pages 脚本
+├── OPERATIONS.md              ← VPS 运维命令速查（爸爸看）
+├── SERVER_GUIDE.md            ← VPS 架构 + 一次性搭建步骤
+├── deploy.sh                  ← 部署：git push + ssh 服务器 git pull + import + 重启
+├── run_server.sh              ← 本地起 dedicated server（开发用，VPS 上 systemd 用同一份）
 │
 ├── scripts/                   ← 所有 GDScript 代码
-│   ├── player.gd              玩家移动/射击/动画
-│   ├── game.gd                游戏规则/计分/换局
-│   ├── network_manager.gd     联网/玩家信息/设置
-│   ├── hud.gd                 HUD/血条/弹药/击杀提示
-│   ├── main_menu.gd           主菜单
-│   ├── stats_store.gd         排行榜数据保存
-│   └── input_setup.gd         键盘按键映射
+│   ├── player.gd              玩家移动 / 射击 / 武器 / Bot AI / 动画
+│   ├── game.gd                游戏规则 / 计分 / 死亡 / 复活 / 服务器伤害表
+│   ├── network_manager.gd     联网状态 / 玩家信息 / 设置
+│   ├── hud.gd                 HP 卡 / 弹药 / 计分板 / 击杀提示 / 连击横幅
+│   ├── main_menu.gd           主菜单逻辑（PLAY / PLAY vs BOTS / Bot 数 / 名字）
+│   ├── pickup.gd              ❤️ 血包 + 🔫 弹药箱（视觉 + 拾取逻辑）
+│   ├── jump_pad.gd            🚀 跳板（弹起 + 视觉脉冲）
+│   ├── stats_store.gd         排行榜持久化（JSON 存档）
+│   ├── touch_controls.gd      手机虚拟摇杆 + 按钮 + 武器键
+│   └── input_setup.gd         键盘 / 鼠标按键映射
 │
-├── scenes/                    ← 场景文件（用 Godot 打开）
-│   ├── main_menu.tscn         主菜单界面
-│   ├── game.tscn              竞技场地图
-│   ├── player.tscn            玩家
-│   ├── hud.tscn               HUD
-│   └── touch_controls.tscn    手机虚拟摇杆
+├── scenes/                    ← 场景（用 Godot 打开）
+│   ├── main_menu.tscn         主菜单 + 排行榜
+│   ├── game.tscn              竞技场（地图 + Pickups + SpawnPoints）
+│   ├── player.tscn            玩家（CharacterBody3D + Camera + Audio）
+│   ├── hud.tscn               游戏内 HUD
+│   └── touch_controls.tscn    手机控制层
 │
-├── models/characters/         ← 18 个 Kenney 方块小人
-├── audio/                     ← 4 个音效（射击/命中/死亡/复活）
-└── docs/                      ← 网页版（GitHub Pages 自动发布这里）
+├── models/characters/         ← 18 个 Kenney 方块小人 GLB
+├── audio/                     ← 射击 / 命中 / 死亡 / 复活
+├── fonts/                     ← Russo One（菜单字体）
+├── themes/                    ← arena_theme.tres（统一字体应用）
+└── docs/                      ← Web 版导出产物（VPS 上 Caddy 直接服务这里）
 ```
 
 ---
 
 ## 🌟 进阶玩法（想挑战）
 
-如果以上的都熟练了，可以试试加新功能：
+很多基础功能已经做完了。下面是真正可以挑战的：
 
-1. **加新地图**：复制 `scenes/game.tscn` 改名 `arena2.tscn`，主菜单加按钮切换
-2. **加武器**：在 `player.gd` 里新增几个常量（伤害、射速），按数字键 `1/2/3` 切换
-3. **加道具**：地图上放个红十字方块，碰到回血 50
-4. **加房间码**：让朋友输入 4 位数字房间号才能加入
-5. **加排行榜表情**：第一名头顶飘个 👑
+1. **武器后坐力**：开枪时让 `camera.rotation.x` 临时上抬 0.02 rad，慢慢回正 → 现实感
+2. **多张地图轮换**：复制 `scenes/game.tscn` 改成 `arena2.tscn`，每场比赛随机选一张
+3. **队伍模式**：进游戏前选红 / 蓝队，友军免伤，谁先到 20 杀
+4. **房间码加入**：让朋友输入 4 位数字房间号才能加入指定房间
+5. **第一名头顶飘 👑**：把当前榜首的 Label3D 加个皇冠 emoji 字符
+6. **武器拾取**：把武器变成地图上的物品（像 Quake），死后丢失现有武器
+7. **Bot 难度设置**：菜单加 Easy / Normal / Hard，对应 BOT_VIEW_RANGE 和 BOT_FIRE_INTERVAL
 
-每加一个功能，先在本地多窗口测试 → 没问题再 export + push。
+每加一个功能，先在本地多窗口测试 → 没问题再 `./deploy.sh` 上线。
 
 ---
 

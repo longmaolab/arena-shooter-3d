@@ -28,13 +28,15 @@ cd /Users/longmao/projects/arena-shooter-3d
 ./deploy.sh
 ```
 
-`deploy.sh` 会:`git push` → `ssh 服务器 git pull` → `systemctl restart arena-game`,**5 秒后玩家硬刷新即可**。
+`deploy.sh` 会:`git push` → `ssh 服务器 git pull` → **`godot --headless --import`**(刷新 `.godot/imported/` 缓存,新加的字体/贴图/模型才能被加载) → `systemctl restart arena-game`,**5 秒后玩家硬刷新即可**。
+
+> ⚠️ 不跑 `--import` 这一步的话,新加的资源(比如新字体/新模型)在服务器上启动时会报 `Cannot open file 'res://.godot/imported/...'`。`deploy.sh` 已自动处理。
 
 ### 只改了服务器端(GDScript 但不影响 Web 客户端)
 
 ```bash
 git push
-ssh root@207.148.98.206 'cd /opt/games/arena-shooter-3d && git pull && systemctl restart arena-game'
+ssh root@207.148.98.206 'cd /opt/games/arena-shooter-3d && git pull && godot --headless --path . --import && systemctl restart arena-game'
 ```
 
 ### 只改了门户

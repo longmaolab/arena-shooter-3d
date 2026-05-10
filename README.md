@@ -8,14 +8,22 @@
 
 ## 怎么玩
 
-| 设备 | 移动 | 视角 | 跳跃 | 射击 | 换弹 |
-|---|---|---|---|---|---|
-| 电脑 | WASD | 鼠标 | 空格 | 左键 | R |
-| 手机 | 左下虚拟摇杆 | 右半屏滑动 | 蓝键 JUMP | 红键 FIRE | 黄键 RELOAD |
+| 设备 | 移动 | 视角 | 跳跃 | 射击 | 换弹 | 切武器 |
+|---|---|---|---|---|---|---|
+| 电脑 | WASD | 鼠标 | 空格 | 左键 | R | 1 / 2 / 3 |
+| 手机 | 左下虚拟摇杆 | 右半屏滑动 | 蓝键 JUMP | 红键 FIRE | 黄键 RELOAD | PIS / SMG / SHG 三个小键 |
 
-- **进入主菜单后先点 < / > 选角色**（18 个方块小人可选：忍者、商人、机器人、骑士…）
-- **胜利条件**：先到 10 杀
-- **新一局**：每局结束后 5 秒倒计时自动开下一局，分数清零
+主菜单两个按钮：
+- **▶ PLAY** —— 上线对战，连 wss://game.boobank.com 跟朋友打
+- **🤖 PLAY vs BOTS** —— 选 1/2/3 个 bot 单机练习（网页版纯本地，桌面版顺便也是 LAN host）
+
+游戏内：
+- 18 个方块小人（< / > 切换），随机起一个
+- **3 把武器**：手枪（重而准）/ SMG（中庸默认）/ 霰弹（近战王）
+- **爆头 2 倍伤害**，准心瞄头会飘 "HEAD! -50" 红字
+- **连击播报**：连杀 2/3/5/7 次屏幕中央闪 DOUBLE / TRIPLE / RAMPAGE / GODLIKE
+- **地图道具**：3 跳板（弹高）+ 1 血包（桥上）+ 1 血包（西南） + 2 弹药箱（隧道 / 东北）
+- 胜利条件：**先到 10 杀**，结束后 5 秒倒计时下一局
 
 ## 项目结构
 
@@ -56,8 +64,8 @@ arena-shooter-3d/
 1. Godot 4.6 打开 `project.godot`
 2. **调试 → 运行多个实例 → 2**
 3. ⌘+B 同时开两个窗口
-4. 窗口 1 → 选个角色 → Host
-5. 窗口 2 → 选不同角色 → Join（IP 默认 127.0.0.1）
+4. 窗口 1：**PLAY vs BOTS**（变本机 host，:7777）
+5. 窗口 2：直接点 **PLAY** —— 编辑器调试时 IP 框已自动填 `ws://127.0.0.1:7777`
 
 ---
 
@@ -99,13 +107,16 @@ cloudflared tunnel run arena-shooter     # 终端 2
 
 | 想改什么 | 改哪个文件 |
 |---|---|
-| 玩家速度 / 血量 / 伤害 / 换弹时间 | `scripts/player.gd` 顶部常量 |
-| 胜利条件 / 新局倒计时 | `scripts/game.gd` 顶部常量 |
+| 玩家速度 / 满血量 / 跳跃 / 换弹时间 / 武器属性 | `scripts/player.gd` 顶部常量 + `WEAPONS` 数组 |
+| **武器伤害（爆头/普通）**——服务器权威 | `scripts/game.gd::SERVER_WEAPON_DAMAGE` |
+| 胜利条件 / 新局倒计时 / 复活冷却 / 复活无敌时长 | `scripts/game.gd` 顶部常量 |
+| Bot AI 行为（巡逻范围、开火间隔等） | `scripts/player.gd` 的 `BOT_*` 常量 + `_bot_tick` |
 | 最大玩家数 / 端口 / 颜色 | `scripts/network_manager.gd` |
-| 地图布局 | Godot 里打开 `scenes/game.tscn`，拖动 CSGBox3D |
+| 地图布局 / 桥 / 隧道 / 跳板位置 | Godot 里打开 `scenes/game.tscn`，拖 CSGBox3D / Pickups |
+| 道具数量 / 复活时间 | `scripts/pickup.gd` 顶部 + `scenes/game.tscn` 的 Pickups 节点 |
 | 主菜单外观 | `scenes/main_menu.tscn` + `scripts/main_menu.gd` |
-| 计分板 / HUD | `scripts/hud.gd` + `scenes/hud.tscn` |
-| 触屏按键位置 | `scripts/touch_controls.gd` 里的 `_recalc_buttons()` |
+| 计分板 / HUD / 连击横幅 | `scripts/hud.gd` + `scenes/hud.tscn` |
+| 触屏按键位置 | `scripts/touch_controls.gd` 里的 `_recalc_layout()` |
 
 ## 重新发布
 
@@ -127,12 +138,35 @@ cloudflared tunnel run arena-shooter     # 终端 2
 - [x] ~~角色走路 / 待机动画~~(v6)
 - [x] ~~死亡音效 + 击杀提示~~(v6)
 - [x] ~~排行榜 + 持久化数据~~(v6,本地存档)
-- [x] ~~永久服务器 URL(Cloudflare 命名隧道)~~(`game.boobank.com`)
+- [x] ~~永久服务器 URL~~(`game.boobank.com`)
 - [x] ~~24h 在线服务器~~(Vultr Tokyo + systemd 自启)
 - [x] ~~多游戏门户~~([game.boobank.com](https://game.boobank.com))
-- [ ] 武器切换(手枪 / 狙击 / 散弹)
-- [ ] 多房间系统(房间码加入)
+- [x] ~~垂直地图（桥、隧道、跳板、阶梯）~~(v6.6)
+- [x] ~~爆头 + 飘字伤害~~(v6.7)
+- [x] ~~血包 / 弹药箱 / 跳板~~(v6.8)
+- [x] ~~3 把武器（手枪 / SMG / 霰弹）切换~~(v6.9)
+- [x] ~~连击播报（DOUBLE KILL / GODLIKE）~~(v6.10)
+- [x] ~~Bot 单人模式（网页版也能打）~~(v6.11–v6.13)
+- [x] ~~复活智能选点（远离敌人）+ 死亡冷却~~(v6.13.2 / v6.17)
+- [ ] 多房间系统（房间码加入）
 - [ ] 多张地图轮换
+- [ ] 武器后坐力 / 摄像机 bob
+- [ ] 队伍模式（红蓝分队，友军免伤）
+
+## 版本里程碑
+
+| 版本 | 内容 |
+|---|---|
+| v5  | 联机 PvP MVP |
+| v6  | 角色动画 / 音效 / 击杀提示 / 排行榜 |
+| v6.6  | 立体地图（中央桥 + 阶梯 + 东侧隧道 + 跳跃平台） |
+| v6.7  | 爆头判定（服务器验证）+ 飘字 -25 / HEAD! -50 |
+| v6.8  | 跳板（弹高 5m）+ 血包（+50）+ 弹药箱（满弹） |
+| v6.9  | 3 把武器切换（PIS / SMG / SHG），各自弹药、爆头伤害表 |
+| v6.10 | 连击播报（2 / 3 / 5 / 7 杀阈值） |
+| v6.11 | Bot AI（巡逻 → 交战状态机），主菜单选 0–3 个 |
+| v6.13 | 网页版可单机 vs Bot（OfflineMultiplayerPeer 兜底）|
+| v6.17 | 死亡 2.5s 复活冷却 + RPC 启动错误静默 |
 
 ## 致谢
 
