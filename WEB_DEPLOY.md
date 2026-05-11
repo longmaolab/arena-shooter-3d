@@ -1,3 +1,18 @@
+# Web Deployment Guide (HISTORICAL)
+
+> ⚠️ **This document is outdated.** It describes the original GitHub Pages
+> deployment from v5/v6.0. The project now runs on a VPS with Caddy and
+> Cloudflare Tunnel — see [SERVER_GUIDE.md](SERVER_GUIDE.md) for the current
+> architecture and [OPERATIONS.md](OPERATIONS.md) for day-to-day operations.
+> Kept here as a development-history snapshot.
+
+> ⚠️ **这个文档已过期。** 这是 v5/v6.0 时期的 GitHub Pages 部署说明。
+> 项目已迁移到 VPS + Caddy + Cloudflare 隧道 —— 当前架构见
+> [SERVER_GUIDE.md](SERVER_GUIDE.md)，日常运维命令见 [OPERATIONS.md](OPERATIONS.md)。
+> 保留在这里作为开发历史快照。
+
+---
+
 # Web 部署完全指南
 
 把游戏发布到网上，让同学打开链接就能玩——一步步来。

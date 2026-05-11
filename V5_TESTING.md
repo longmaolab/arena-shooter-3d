@@ -1,3 +1,16 @@
+# v5 LAN Testing Guide (HISTORICAL)
+
+> ⚠️ **This document is outdated.** It describes the v5 / pre-bot LAN smoke
+> test. For current two-window editor testing instructions, see
+> [KIDS_GUIDE.md](KIDS_GUIDE.md) Part 3.
+> Kept here as a development-history snapshot.
+
+> ⚠️ **这个文档已过期。** 这是 v5 / 引入 bot 之前的 LAN 冒烟测试说明。
+> 当前的双窗口编辑器测试流程见 [KIDS_GUIDE.md](KIDS_GUIDE.md) 第 3 部分。
+> 保留在这里作为开发历史快照。
+
+---
+
 # v5 联机阶段 1 — 本地测试指南
 
 ## 验收目标

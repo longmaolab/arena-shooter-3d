@@ -1,4 +1,538 @@
-# Arena Shooter 3D — 操作手册
+# Arena Shooter 3D — Kid's Guide
+
+> 📘 English version first. 中文版在文件下半部分 ([跳到中文](#arena-shooter-3d--操作手册中文)).
+
+> Hey kid: this is the multiplayer shooter you and your friends play and modify.
+> Everything you need is laid out below — read it top to bottom.
+
+---
+
+## 🎮 Part 1: How to play
+
+### Controls
+
+| Device | Move | Look | Jump | Shoot | Reload | Switch weapon |
+|---|---|---|---|---|---|---|
+| Desktop | W / A / S / D | Mouse | Space | Left click | R | **Number keys 1 / 2 / 3** |
+| Mobile | Left thumb stick | Right-half drag | JUMP button | FIRE button | RELOAD button | PIS / SMG / SHG chips |
+
+### The two big menu buttons
+
+- **▶ PLAY** (green) — go online, connect to the remote server and play with friends
+- **🤖 PLAY vs BOTS** (purple) — pick 1 / 2 / 3 bots and practice solo
+  - **On web**: fully local, no internet needed
+  - **On desktop**: also opens a LAN host that friends can join
+
+### Game rules
+
+- **Win condition**: first to **10 kills** wins (counts kills against humans + bots)
+- **When you die**: black screen → **wait 2.5 seconds** → teleport to the spawn point farthest from enemies → 1.5 s invincibility (character blinks)
+- **After a match ends**: 5-second countdown in the screen center → next round auto-starts, scores reset
+
+### Three weapons (press 1 / 2 / 3 to switch)
+
+| Key | Weapon | Damage (body / head) | Mag | Fire rate | Best for |
+|---|---|---|---|---|---|
+| 1 | 🔫 **Pistol** | 50 / 100 | 12 | Slow | Long range + headshot one-shot |
+| 2 | 💨 **SMG** (default) | 25 / 50 | 30 | Fast | Mid-range sustained |
+| 3 | 💥 **Shotgun** | 18 / 36 × 5 pellets | 8 | Very slow | Point-blank ~90 damage |
+
+> 💡 **Headshot detection**: if your crosshair lands on the upper third of an enemy, damage is ×2 and red `HEAD! -50` floats up from the impact.
+
+### Map pickups (**find them!**)
+
+- 🚀 **Jump pads** (cyan glowing discs, ×3) — step on one to launch 5 m into the air; lets you jump straight from the ground onto the bridge
+- ❤️ **Health packs** (white box with red cross, ×2) — walk over for +50 HP (one on the bridge, one in the SW corner)
+- 🔫 **Ammo crates** (amber glowing wooden boxes, ×2) — walk over for full ammo on all three weapons (one in the east tunnel, one in the NE corner)
+- Once picked up, they **disappear for 30 seconds** and then respawn automatically
+
+### Killstreak banners 🔥
+
+If you keep killing without dying, the screen center flashes:
+
+| Streak | Banner | Color |
+|---|---|---|
+| 2 | 🔥 DOUBLE KILL | Yellow |
+| 3 | 🔥 TRIPLE KILL | Orange |
+| 5 | 🔥 RAMPAGE | Red |
+| 7 | 🔥 GODLIKE | Purple |
+
+Die once → streak resets to 0, build it back up.
+
+### Scoreboard
+
+- **In-game top-right**: live K / D for everyone in this match
+- **Menu right panel**: all-time leaderboard (sorted by wins, persisted forever)
+
+> First launch picks a random English name + random skin for you. Change them once and they'll stick next time.
+
+---
+
+## 🚀 Part 2: Letting friends play
+
+**Good news: the server runs 24/7 on a VPS, so you and Dad don't have to do anything**. Just share the link:
+
+```
+https://game.boobank.com/arena-shooter/
+```
+
+Friend opens it → picks a character → clicks **PLAY** → connected!
+
+### Want to play solo vs bots (no internet)
+
+Open the same link, click the purple **PLAY vs BOTS** button, pick 1/2/3 bots, and go. This doesn't need the server, so it still works on a flaky Wi-Fi.
+
+### Server-check commands (Dad uses these occasionally)
+
+If a friend says "I can't connect", have Dad SSH the VPS:
+
+```bash
+ssh root@207.148.98.206 'systemctl is-active arena-game caddy cloudflared'
+# all three should be: active
+
+ssh root@207.148.98.206 'journalctl -u arena-game -n 30 --no-pager'
+# recent game-server log
+```
+
+Full ops commands in [`OPERATIONS.md`](OPERATIONS.md).
+
+---
+
+## ✏️ Part 3: Modifying the game (small tweaks)
+
+### Open the project in Godot
+
+1. Launch Godot 4.6.2
+2. Click **Import** → pick `/Users/longmao/projects/arena-shooter-3d/project.godot`
+3. You're in the editor
+
+### Local testing after edits
+
+- Top menu **Debug → Run Multiple Instances → 2** (so two windows open at once, simulating two players)
+- Press **⌘ + B** to launch both windows
+- Window 1: pick a character → click **🤖 PLAY vs BOTS** (this window becomes the local host)
+- Window 2: just click **▶ PLAY** (the IP field is pre-filled with `ws://127.0.0.1:7777`)
+
+### Common tweaks cheatsheet
+
+| What to change | File | Line |
+|---|---|---|
+| **Walk speed** | `scripts/player.gd` | `const SPEED := 6.0` |
+| **Sprint speed** | `scripts/player.gd` | `const SPRINT_SPEED := 10.0` |
+| **Jump height** | `scripts/player.gd` | `const JUMP_VELOCITY := 8.5` |
+| **Jump pad boost** | `scripts/jump_pad.gd` | `const JUMP_BOOST := 16.0` |
+| **Max HP** | `scripts/game.gd` | `const SERVER_MAX_HEALTH := 100` |
+| **All 3 weapon stats** (damage / mag / fire rate / spread) | `scripts/player.gd` | `const WEAPONS := [...]` |
+| **Server damage table** (body / headshot) | `scripts/game.gd` | `const SERVER_WEAPON_DAMAGE := [...]` |
+| **Respawn delay after death** | `scripts/game.gd` | `const SERVER_RESPAWN_DELAY := 2.5` |
+| **Post-respawn invincibility** | `scripts/game.gd` | `const SERVER_RESPAWN_INVINCIBILITY := 1.5` |
+| **Kills to win** | `scripts/game.gd` | `const KILLS_TO_WIN := 10` |
+| **New-round countdown** | `scripts/game.gd` | `const NEW_GAME_DELAY := 5.0` |
+| **Bot view range / fire interval** | `scripts/player.gd` | `const BOT_VIEW_RANGE := 22.0` etc |
+| **Streak thresholds** | `scripts/game.gd` `_handle_kill` | `if streak == 2 or 3 or 5 or 7:` |
+| **Health pack heal amount** | `scripts/pickup.gd` | `@export var heal_amount: int = 50` |
+| **Pickup respawn time** | `scripts/pickup.gd` | `@export var respawn_time: float = 30.0` |
+| **Max players** | `scripts/network_manager.gd` | `const MAX_PLAYERS := 8` |
+| **Default random names** | `scripts/network_manager.gd` | `const COMMON_NAMES := [...]` |
+
+### Editing the map
+
+- Open `scenes/game.tscn` in the Godot editor
+- In the scene tree, the CSGBox3D nodes under `Game` (Floor, Wall_, Cover_, Tower_, Bridge_, Stair_, Tunnel_, Platform_) — drag their position / `size` to reshape walls, the bridge, stairs
+- `Pickups` contains 8 items (HP_ / AM_ / JumpPad_) — drag to change where they appear
+- `SpawnPoints` contains 6 Marker3D nodes — drag to change where players spawn
+
+### Adding / removing the default bot count
+
+The main menu's 1 / 2 / 3 buttons set the count. To make the default 3 instead of 2:
+
+- In `scenes/main_menu.tscn`, find the `Bot2` node → copy `button_pressed = true` to `Bot3`, remove it from `Bot2`
+
+---
+
+## 🌐 Part 4: Pushing changes so friends see them
+
+After editing code, **the web version won't auto-update**. Three steps:
+
+### Step ① Export from Godot
+
+1. Top menu **Project → Export**
+2. Pick **Web (Runnable)** → click **Export Project**
+3. Leave the path as default (`docs/index.html`) → save
+4. Wait a few seconds for the export to finish
+
+### Step ② Clean up Godot editor leftovers
+
+In a terminal:
+
+```bash
+cd /Users/longmao/projects/arena-shooter-3d
+find docs -name "*.import" -delete
+```
+
+### Step ③ Push to the VPS
+
+```bash
+./deploy.sh
+```
+
+Or manually:
+
+```bash
+git add -A
+git commit -m "Update game: write what you changed here"
+git push
+```
+
+> After pushing, hold ⌘+Shift+R in the browser to force a refresh. Friend should see the new version within a few seconds.
+
+---
+
+## 🐛 Part 5: Common problems
+
+### Q1: Friend opens the page but PLAY does nothing / "Connection failed"
+- The server runs 24/7 on the VPS, so it depends on whether the VPS services are alive
+- Have Dad SSH in: `ssh root@207.148.98.206 'systemctl is-active arena-game caddy cloudflared'`
+- All three should say `active`. If any aren't, restart it: `ssh root@207.148.98.206 'systemctl restart arena-game'`
+- Meanwhile your friend can click the purple **PLAY vs BOTS** for offline single-player while you fix the server
+
+### Q2: Two-window debug, the second one fails to PLAY
+- Window 1 must click **🤖 PLAY vs BOTS** first (so it becomes the local host)
+- Window 2's IP field is already filled with `ws://127.0.0.1:7777`, **just click PLAY**
+- If you changed the IP field, change it back to `ws://127.0.0.1:7777`
+
+### Q3: Chinese characters show as squares in the browser
+- Godot's Web export doesn't include CJK fonts (they'd bloat the wasm)
+- Keep menu text in English / digits / symbols / emoji only
+
+### Q4: Editor shows a flood of "Node not found: Game/Players/N"
+- This used to happen when window 2's game scene wasn't loaded yet but window 1 was already broadcasting positions → fixed in v6.17: every player waits 1.5 s before its first state broadcast
+- A few of these on the very first frame are still harmless — game runs fine
+
+### Q5: Bullets don't hit anyone
+- Fixed in v6.6: each Kenney character limb (hand / foot / head) has its own StaticBody3D collider, so the ray hits a child node rather than the main body. The shoot logic walks up the parent chain to find the right player.
+- See `_find_player_root()` in `scripts/player.gd`
+- There's also **headshot detection**: hits above Y > 1.4 m deal 2× damage
+
+### Q6: Bots are too hard / too easy
+- They spot you from too far → change `player.gd::BOT_VIEW_RANGE` (default 22 m → 12 m makes them "near-sighted")
+- They fire too fast → `BOT_FIRE_INTERVAL` default 0.7 s → bump to 1.5 to slow them
+- They never give up the chase → `BOT_LOSE_RANGE` default 30 m → smaller value makes them lose interest sooner
+
+### Q7: Edited a file in Godot but the game doesn't reflect it
+- Did you save? (a `*` in the title bar means unsaved)
+- Try **Project → Reload Current Project**
+- If still stuck, fully close and reopen Godot
+
+### Q8: Mobile keyboard doesn't pop up
+- Already fixed: `virtual_keyboard_enabled` is on in Project Settings
+- Tapping the name input should bring it up
+
+### Q9: Friends still see the old version
+- Their browser cached the old pck. Have them **hard refresh**: ⌘+Shift+R (Mac) or Ctrl+Shift+R (Windows)
+- Or fully close the tab and reopen
+
+---
+
+## 📁 Part 6: What each file is
+
+```
+arena-shooter-3d/
+├── project.godot              ← Open this file in Godot
+├── README.md                  ← Full README (developer overview)
+├── KIDS_GUIDE.md              ← The one you're reading
+├── OPERATIONS.md              ← VPS ops cheatsheet (Dad reads)
+├── SERVER_GUIDE.md            ← VPS architecture + one-time setup
+├── deploy.sh                  ← Deploy: git push + ssh server git pull + import + restart
+├── run_server.sh              ← Local dedicated-server launcher (dev use; same script the VPS systemd unit calls)
+│
+├── scripts/                   ← All GDScript code
+│   ├── player.gd              Player movement / shooting / weapons / bot AI / animations
+│   ├── game.gd                Game rules / scoring / death / respawn / server damage table
+│   ├── network_manager.gd     Connection state / player roster / settings
+│   ├── hud.gd                 HP card / ammo / scoreboard / kill banner / streak banner
+│   ├── main_menu.gd           Menu logic (PLAY / PLAY vs BOTS / bot count / name)
+│   ├── pickup.gd              ❤️ Health pack + 🔫 ammo crate (visuals + pickup logic)
+│   ├── jump_pad.gd            🚀 Jump pad (boost + glow pulse)
+│   ├── stats_store.gd         Leaderboard persistence (JSON file)
+│   ├── touch_controls.gd      Mobile joystick + action buttons + weapon chips
+│   └── input_setup.gd         Keyboard / mouse key mappings
+│
+├── scenes/                    ← Scenes (open in Godot)
+│   ├── main_menu.tscn         Main menu + leaderboard
+│   ├── game.tscn              Arena (map + Pickups + SpawnPoints)
+│   ├── player.tscn            Player (CharacterBody3D + Camera + Audio)
+│   ├── hud.tscn               In-game HUD
+│   └── touch_controls.tscn    Mobile control overlay
+│
+├── models/characters/         ← 18 Kenney blocky character GLBs
+├── audio/                     ← Shoot / hit / death / respawn
+├── fonts/                     ← Russo One (menu display font)
+├── themes/                    ← arena_theme.tres (unified font theme)
+└── docs/                      ← Web export output (Caddy serves this on the VPS)
+```
+
+---
+
+## 🌟 Stretch ideas (real challenges)
+
+Most basics are already done. Things that are still worth attempting:
+
+1. **Weapon recoil**: on shoot, temporarily nudge `camera.rotation.x` up by 0.02 rad and let it ease back → punchy feel
+2. **Map rotation**: copy `scenes/game.tscn` into `arena2.tscn`; each match randomly picks one
+3. **Team mode**: pick red / blue team before the match, friendly fire off, first to 20 kills wins
+4. **Room codes**: friends enter a 4-digit room number to join a specific lobby
+5. **Crown on the leader**: add a 👑 emoji label above whoever currently leads
+6. **Weapon pickups**: turn weapons into world items (Quake-style); on death you drop your current weapon
+7. **Bot difficulty setting**: add Easy / Normal / Hard buttons that map to different `BOT_VIEW_RANGE` and `BOT_FIRE_INTERVAL`
+
+For each feature: test locally with two windows first → if it works, `./deploy.sh` to ship it.
+
+---
+
+## 🆘 Really stuck?
+
+Screenshot the error and send it to Dad with what you clicked and what went wrong.
+
+Game development is just a long sequence of bumping into problems and solving them. **Nobody gets it right the first try — keep at it and it gets easier.**
+
+Have fun! 🎯
+
+---
+
+# 📖 Appendix: How this game was actually built
+
+> This section is Dad's running conversation with an AI assistant (Claude) while building the project — a kind of retrospective. Reading it tells you why each design decision was made, so you can do something similar from scratch later.
+
+## A1. What we wanted to build
+
+Dad asked the AI: **"My 12-year-old knows Python and Scratch and loves competitive games. What's a good next step?"**
+
+We considered several options:
+
+| Option | Pros | Cons | Verdict |
+|---|---|---|---|
+| **UE5 / Unreal Editor for Fortnite** | AAA visuals, same tools as Fortnite | Brutal learning curve, heavy hardware, Verse syntax not kid-friendly | Postpone |
+| **Stick with Pygame** | Already knows it | 2D only, no easy networking | Already mastered, want next level |
+| **Godot 4 (3D)** | Open source, lightweight, GDScript syntax like Python, great docs | Visuals a notch below UE5 | ✅ **This one** |
+| **HTML5 / Three.js** | Runs directly in browsers | JavaScript more complex than GDScript | Too low-level |
+
+**Final pick: Godot 4 + 3D + first-person shooter + multiplayer.**
+
+## A2. Project version history
+
+```
+v1   → Single-player FPS (vs AI mobs) — establish the fundamentals
+v4   → Originally split-screen; skipped (two gamepads on one device is awkward)
+v5   → Multiplayer PvP — core feature shipped
+v6   → Animations + SFX + kill feed + leaderboard
+v6.1 → Bug fixes + shooting feel polish + random default identity
+```
+
+Every version was a **playable product**, not a half-finished thing. That's the rule: **keep the game running at every step, then add the next thing**.
+
+## A3. Key technical decisions (and why)
+
+### Decision 1: WebSocket instead of ENet for networking
+
+- **ENet** is Godot's default — UDP, fast, but **browsers can't use it**
+- **WebSocket** is a tiny bit slower (milliseconds), but **the same code works in browser and native**
+
+> Trade-off: friends on phones / random PCs can play > absolute lowest latency. **Get something playable first, optimize later.**
+
+### Decision 2: Server-authoritative architecture
+
+Every shot, every HP change, every kill — **the server decides**, the client just displays.
+
+```
+Player A clicks shoot
+  ↓ Client plays SFX + tracer locally (feels instant)
+  ↓ Also RPCs the server: "I hit B"
+  ↓ Server validates → deducts B's HP → broadcasts to everyone
+  ↓ Everyone sees B's HP bar drop
+```
+
+Why? If clients could directly damage other clients, **cheating is trivial** — edit one line and one-shot everyone.
+
+### Decision 3: Use Kenney CC0 models, don't model from scratch
+
+- **Kenney.nl** has 18 free blocky characters with 27 baked animations (idle / walk / sprint / die / shoot)
+- All under CC0 (**fully free, commercial OK, no attribution required**)
+- Modeling + rigging + animating in Blender by hand would take 2 weeks
+
+> Design principle: **don't reinvent the wheel. Use existing assets and spend your time on gameplay.**
+
+### Decision 4: Start with Mac + Cloudflare Tunnel, end up on a VPS
+
+- Cloud servers (Fly.io, AWS) want a credit card and cost monthly
+- **Cloudflare Tunnel** is free, no credit card, gives you a public address
+- Initial flow: friend's browser → `wss://game.boobank.com` → Cloudflare → your Mac's port 7777
+
+Cost: **the Mac being off = no game**. Acceptable for early days, but eventually we moved to a real VPS for 24/7 uptime. See [SERVER_GUIDE.md](SERVER_GUIDE.md).
+
+### Decision 5: Host the web build on GitHub Pages (initially)
+
+- GitHub gives every user a free URL: `https://<user>.github.io/<repo>/`
+- About a minute after `git push`, it's live
+- $0, zero config, stable enough
+
+Later we moved web hosting onto the same VPS so we control caching / cache-busting precisely.
+
+## A4. Bugs we hit along the way (you'll likely meet these too)
+
+### Bug 1: Godot says `Identifier not found: NetworkManager`
+
+**Cause**: `NetworkManager` is an autoload (global singleton); you have to **register it in Project → Project Settings → Autoload** before other scripts can see it.
+
+**Lesson**: autoloads must be registered first, used second.
+
+### Bug 2: In multiplayer, player A can see B but can't kill them
+
+**Cause**: server-authoritative architecture — client A calls `respawn_player.rpc_id(B)`, but the RPC mode `call_remote` **disallows targeting yourself**. When A == server (host), `rpc_id(self)` errors.
+
+**Fix**: change `call_remote` to `call_local` so the local machine also runs the handler.
+
+**Lesson**: **always be clear about "which machine does this RPC run on"**:
+- `call_local` = also run on the sender
+- `call_remote` = only on others
+- `authority` = only the node's authority can call this
+- `any_peer` = anyone can call this
+
+### Bug 3: Chinese characters show as squares (口口口口) in the browser
+
+**Cause**: Godot's Web export **doesn't bundle CJK fonts** (they're huge and would balloon the wasm).
+
+**Fix**: convert all menu text to English. Keep CJK for user-typed names + the README.
+
+**Lesson**: **the web build needs different font hygiene** — use English when you can.
+
+### Bug 4: Browser host errors with `Host failed: 22`
+
+**Cause**: browsers **can't bind a server socket** (security restriction), so the web build can't be a host.
+
+**Fix**: in the web build, disable the Host button and rename it. (Later in v6.13 we made it fall back to `OfflineMultiplayerPeer` for single-player bot mode.)
+
+**Lesson**: **understand your platform's limits** — know what browsers can and can't do.
+
+### Bug 5: Browser keeps 404'ing `server.json`
+
+**Cause**: when `HTTPRequest` uses a relative path `"server.json"`, **browsers resolve it relative to the page origin**, not the sub-path `/arena-shooter-3d/`.
+
+**Fix**: use `JavaScriptBridge.eval(...)` to read `location.pathname` and build the absolute URL.
+
+**Lesson**: **relative paths under a sub-path need extra care**. Godot client code looks like it's "loading a local file", but it's actually an HTTP fetch.
+
+### Bug 6: Dedicated server fails to start: `port already in use`
+
+**Cause**: previous Godot process didn't exit cleanly; port 7777 still held.
+
+**Fix**: prepend `run_server.sh` with auto-cleanup:
+```bash
+existing_pids=$(lsof -nP -tiTCP:7777 -sTCP:LISTEN)
+if [ -n "$existing_pids" ]; then kill $existing_pids; sleep 1; fi
+```
+
+**Lesson**: **scripts should handle "last run didn't clean up"**.
+
+### Bug 7: Bullets stop hitting after switching to Kenney characters
+
+**Cause**: Kenney's GLB model has its **own StaticBody3D colliders on each limb** (hand / foot / head). The ray hits one of these child nodes; the parent `CharacterBody3D` test fails.
+
+**Fix**: after the ray hits, **walk up the parent chain** until you find a player root:
+```gdscript
+func _find_player_root(node: Node) -> CharacterBody3D:
+    var n: Node = node
+    while n:
+        if n is CharacterBody3D and n.is_in_group("player"):
+            return n
+        n = n.get_parent()
+    return null
+```
+
+**Lesson**: **inspect the scene tree of any imported third-party model** to see what hidden children it brought along.
+
+### Bug 8: Animations not playing
+
+**Cause**: Kenney GLBs ship with an `AnimationPlayer`, but the default animations **don't loop** (idle / walk play once and stop).
+
+**Fix**: after import, iterate the animations and set looping mode for movement anims:
+```gdscript
+for n in _anim_player.get_animation_list():
+    if n in ["idle", "walk", "sprint"]:
+        _anim_player.get_animation(n).loop_mode = Animation.LOOP_LINEAR
+```
+
+**Lesson**: **animation system gotchas (loop mode, transitions, blending) are invisible footguns**.
+
+### Bug 9: Muzzle flash looks ugly (a single ugly flashing cube)
+
+**Cause**: initial implementation used a BoxMesh scaled 2.5× → looked like **a yellow cube popping out of the gun**.
+
+**Fix**: SphereMesh + material emission fade + unshaded shading. Combined with a tracer (a thin line from muzzle to impact).
+
+**Lesson**: **better visual feedback isn't about more brightness, it's about natural movement**. Easing > hard cuts.
+
+## A5. Building your own game like this
+
+If you want to build something similar from scratch, here's a suggested order:
+
+### Stage 1: Make it playable solo (1–2 weeks)
+
+1. Learn Godot 4 basics: nodes / scenes / scripts (run through the "Your First Game" tutorial)
+2. Build a 3D scene: ground + a few crates + a first-person player (CharacterBody3D + Camera3D + RayCast3D)
+3. Implement: movement, jump, mouse look, left-click shoots a ray
+4. Add HP, ammo, UI labels
+
+> **This is the most important step**: get solo working *first*, then think about networking. **Never plan multiplayer before single-player works.**
+
+### Stage 2: Add multiplayer (1 week)
+
+1. Register the `NetworkManager` autoload
+2. Use `WebSocketMultiplayerPeer` for server + client
+3. Sync the player roster via `multiplayer.peer_connected`
+4. The big one: **position sync, shoot sync, HP sync** all go through RPCs
+5. Test with two windows (Debug → Run Multiple Instances → 2)
+
+### Stage 3: Deploy on the web (half a day)
+
+1. Project Settings → Web export, path `docs/index.html`
+2. Create a GitHub repo, push `docs/`
+3. Enable GitHub Pages in repo settings, point at `main` branch's `docs/` folder
+4. The link looks like `https://<user>.github.io/<repo>/`
+
+### Stage 4: Art + audio (1 week)
+
+1. Browse [kenney.nl](https://kenney.nl) for CC0 assets
+2. Characters: blocky-characters
+3. SFX: sci-fi-sounds or impact-sounds
+4. Preload everything with `preload()` — best performance
+
+### Stage 5: Polish (open-ended)
+
+- Kill feed
+- Leaderboard
+- Persistence (ConfigFile or JSON)
+- Touch controls (mobile support)
+
+## A6. A note from Dad
+
+The biggest lessons from building this:
+
+1. **Make it work, then make it good**. Every version should be playable, then you add one more thing.
+2. **Read the logs first**. 99% of the time the Godot console's red text tells you exactly what's wrong — don't skim past it.
+3. **Copying code isn't shameful**. GitHub, the Godot forum, official samples — copy freely.
+4. **Print-debug a lot**. Sprinkle `print()` to see "where does the program get to before it breaks".
+5. **`git commit` after every working chunk**. When something breaks, `git diff` shows what you changed; `git checkout` rewinds.
+
+Game bugs are a kind of maze. Every one you solve makes you a notch sharper. **Finishing one full game (even a simple one) teaches you more than 100 tutorials.**
+
+Good luck — looking forward to seeing what you build next 🚀
+
+---
+
+<a id="arena-shooter-3d--操作手册中文"></a>
+
+# Arena Shooter 3D — 操作手册（中文）
 
 > 给小作者：这是你和朋友一起玩、一起改的多人射击游戏。这份文档把所有要做的事都列清楚了，按顺序看就行。
 
@@ -22,7 +556,7 @@
 
 ### 游戏规则
 
-- **赢的条件**：第一个杀到 **10 个**人/bot 的赢
+- **赢的条件**：第一个杀到 **10 个** 人/bot 的赢
 - **死了会怎样**：黑屏 → **等 2.5 秒** → 传送到离敌人最远的出生点 → 无敌 1.5 秒（小人闪烁）
 - **每局结束后**：屏幕中央倒计时 5 秒 → 自动开下一局，分数清零
 
@@ -167,7 +701,7 @@ cd /Users/longmao/projects/arena-shooter-3d
 find docs -name "*.import" -delete
 ```
 
-### 步骤 ③ 推送到 GitHub
+### 步骤 ③ 推送
 
 ```bash
 ./deploy.sh
@@ -181,7 +715,7 @@ git commit -m "更新游戏：你做了什么改动写在这里"
 git push
 ```
 
-> 推完大概等 1 分钟，GitHub Pages 才会更新。可以让朋友刷新一下浏览器试试。
+> 推完大概等几秒，让朋友 ⌘+Shift+R 硬刷新一下浏览器就能看到新版本。
 
 ---
 
@@ -297,7 +831,7 @@ Have fun! 🎯
 
 ---
 
-# 📖 附录：这个游戏是怎么做出来的
+# 📖 附录：这个游戏是怎么做出来的（中文）
 
 > 这部分是爸爸和 AI 助手（Claude）一路对话做出来的"项目复盘"。看完你就能明白每个决定为什么这么选，以后想自己做类似的游戏，可以照着这个思路走。
 
@@ -359,19 +893,21 @@ v6.1→ 修 bug + 优化射击手感 + 随机默认身份
 
 > 设计原则：**别造轮子。能用现成的就用现成的，把时间花在游戏玩法上。**
 
-### 决定 4：服务器跑在爸爸 Mac 上 + Cloudflare Tunnel 暴露公网
+### 决定 4：先 Mac + Cloudflare Tunnel，后来上 VPS
 
 - 云服务器（Fly.io、AWS）要绑信用卡，且每月有钱
 - **Cloudflare Tunnel** 免费、不要信用卡、给你一个公网地址
-- 流程：朋友的浏览器 → `wss://game.boobank.com` → Cloudflare → 你 Mac 的 7777 端口
+- 初期流程：朋友的浏览器 → `wss://game.boobank.com` → Cloudflare → 你 Mac 的 7777 端口
 
-代价：**Mac 不开机就停服**。可以接受。
+代价：**Mac 不开机就停服**。早期能接受，后来移到真 VPS 实现 24h 在线。详见 [SERVER_GUIDE.md](SERVER_GUIDE.md)。
 
-### 决定 5：网页版托管在 GitHub Pages
+### 决定 5：早期网页版托管 GitHub Pages
 
 - GitHub 给每个用户一个免费网址：`https://用户名.github.io/项目名/`
 - 每次 `git push` 之后大概 1 分钟自动上线
 - 0 元、0 配置、足够稳
+
+后来 Web 托管也搬到同一个 VPS，缓存控制（cache-busting）更精确。
 
 ## A4. 一路踩过的坑（你以后可能也会遇到）
 
@@ -405,7 +941,7 @@ v6.1→ 修 bug + 优化射击手感 + 随机默认身份
 
 **原因**：浏览器**不能监听 socket**（安全限制），所以网页版不能当服务器。
 
-**修法**：网页版的 Host 按钮**直接禁用**，按钮文字改成 "Host (desktop only)"。
+**修法**：网页版的 Host 按钮**直接禁用**，按钮文字改成 "Host (desktop only)"。（v6.13 后改成 `OfflineMultiplayerPeer` 兜底单机 vs Bot 模式）
 
 **教训**：**先搞清楚目标平台的能力边界**——浏览器能做什么、不能做什么。
 

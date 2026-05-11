@@ -1,4 +1,15 @@
-# Overnight Autonomous Session — 2026-05-09
+# Overnight Autonomous Session — 2026-05-09 (HISTORICAL LOG)
+
+> 📘 **This is a one-time development-history snapshot** — a transcript-style
+> log of an overnight autonomous AI session that produced v6.3 → v6.5.1.
+> It's preserved as-is for the record; current docs are README.md /
+> KIDS_GUIDE.md / OPERATIONS.md / SERVER_GUIDE.md.
+
+> 📘 **这是一次性的开发历史快照** —— 一次通宵自动 AI 会话的工作流水账，
+> 产出了 v6.3 → v6.5.1 几个版本。保留原样作为历史记录；当前文档请看
+> README.md / KIDS_GUIDE.md / OPERATIONS.md / SERVER_GUIDE.md。
+
+---
 
 > AI 助手在用户睡觉期间的工作日志。
 > 早上你只看这份就知道发生了什么。
