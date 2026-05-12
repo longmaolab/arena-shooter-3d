@@ -98,18 +98,22 @@ The server runs 24/7, so even if your Mac is off, friends can still play.
 Full architecture and setup steps in [SERVER_GUIDE.md](SERVER_GUIDE.md);
 day-to-day ops commands in [OPERATIONS.md](OPERATIONS.md).
 
-## Local fallback server (optional)
+## Mac as backup public server (optional, only when the VPS is down)
 
-Two-window local play works as described above. If you want the Mac
-to temporarily act as the public server (e.g., during VPS maintenance):
+> This section is **not** for local play with your kid — local Godot
+> debug uses `127.0.0.1` and doesn't need cloudflared at all (see the
+> "Local debug" section above). This is only if you want the **Mac to
+> stand in for the VPS** as the internet-facing server (e.g. during
+> VPS maintenance).
 
 ```bash
 ./run_server.sh                          # terminal 1
 cloudflared tunnel run arena-shooter     # terminal 2
 ```
-**Note**: the Mac's cloudflared and the VPS's cloudflared share the same
-tunnel, so Cloudflare will HA-route between them. Don't run both
-unless you mean to split traffic.
+
+The Mac's cloudflared and the VPS's cloudflared share the same tunnel,
+so Cloudflare will HA-route between them. Don't run both at the same
+time unless you mean to split traffic.
 
 ---
 
@@ -286,17 +290,18 @@ https://game.boobank.com/arena-shooter/
 服务器 24h 跑，Mac 关机也不影响。详细架构和搭建过程见 [SERVER_GUIDE.md](SERVER_GUIDE.md)；
 日常运维命令速查见 [OPERATIONS.md](OPERATIONS.md)。
 
-## 本地调试 + 测试服（可选）
+## Mac 当临时公网服务器(可选,只在 VPS 挂了时用)
 
-只想本地两个窗口对打，跟"本机调试"一节一样。
-想用 Mac 临时当服务器（比如服务器维护时）：
+> 这一节**不是**给你和孩子本地玩用的 —— **本地两个窗口对打** 直接走 `127.0.0.1`,不需要 cloudflared,见上面"本机调试"一节。
+> 这一节只在你想用 **Mac 顶替 VPS 当公网服务器**(比如 VPS 维护时)才用得到。
 
 ```bash
 ./run_server.sh                          # 终端 1
 cloudflared tunnel run arena-shooter     # 终端 2
 ```
-**注意**：Mac 上 cloudflared 会和服务器一起注册到同一个隧道，Cloudflare 自动 HA 路由。
-不想分流就别同时跑。
+
+Mac 上 cloudflared 会和 VPS 上 cloudflared 注册到同一个隧道,Cloudflare 自动 HA 路由。
+**不想分流就别同时跑两边**(VPS 没维护就别开 Mac 这边)。
 
 ---
 

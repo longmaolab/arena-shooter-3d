@@ -176,15 +176,20 @@ find docs -name "*.import" -delete
 ./deploy.sh
 ```
 
-Or manually:
+That's it. `deploy.sh` does **commit + push to GitHub + ssh into the VPS + git pull + re-import + restart the game server** in one go.
+
+> ⚠️ A plain `git push` alone is **not enough** anymore — that only pushes to GitHub but doesn't update the VPS. (We're no longer on GitHub Pages, so GitHub itself doesn't serve the game.) Always use `./deploy.sh`.
+
+If `deploy.sh` ever errors out, here are the same steps run by hand:
 
 ```bash
 git add -A
 git commit -m "Update game: write what you changed here"
 git push
+ssh root@207.148.98.206 'cd /opt/games/arena-shooter-3d && git pull && godot --headless --path . --import && systemctl restart arena-game'
 ```
 
-> After pushing, hold ⌘+Shift+R in the browser to force a refresh. Friend should see the new version within a few seconds.
+After `deploy.sh` finishes (~5 seconds), tell your friend to hit ⌘+Shift+R (Mac) or Ctrl+Shift+R (Windows) — the browser still caches the old `.pck` and `.wasm`, so a hard refresh is needed to pull the new build.
 
 ---
 
@@ -707,15 +712,20 @@ find docs -name "*.import" -delete
 ./deploy.sh
 ```
 
-或者手动：
+就这一条命令搞定。`deploy.sh` 内部会:**commit + push 到 GitHub + ssh 上 VPS + git pull + 重新 import + 重启游戏服务器**,5 秒搞完。
+
+> ⚠️ 现在 **`git push` 单独跑是没用的** —— 它只推到 GitHub,不会更新 VPS。我们已经**不用 GitHub Pages 了**,GitHub 本身不发布游戏,真正在线的是 VPS。所以**永远用 `./deploy.sh`**。
+
+万一 `deploy.sh` 报错跑不通,下面是它内部等价的手动版本:
 
 ```bash
 git add -A
-git commit -m "更新游戏：你做了什么改动写在这里"
+git commit -m "更新游戏:你做了什么改动写在这里"
 git push
+ssh root@207.148.98.206 'cd /opt/games/arena-shooter-3d && git pull && godot --headless --path . --import && systemctl restart arena-game'
 ```
 
-> 推完大概等几秒，让朋友 ⌘+Shift+R 硬刷新一下浏览器就能看到新版本。
+`deploy.sh` 跑完(~5 秒)之后,让朋友按 ⌘+Shift+R(Mac)或 Ctrl+Shift+R(Win)**硬刷新** —— 浏览器还缓存着老的 `.pck` 和 `.wasm`,不硬刷新看到的还是旧版。
 
 ---
 
