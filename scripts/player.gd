@@ -232,6 +232,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		rotate_y(-event.relative.x * MOUSE_SENSITIVITY)
 		camera.rotate_x(-event.relative.y * MOUSE_SENSITIVITY)
 		camera.rotation.x = clamp(camera.rotation.x, -1.25, 1.25)
+	# Left-click anywhere in the game window re-captures the mouse after the
+	# kid pressed ESC. Without this branch they could move + shoot but
+	# couldn't turn (mouse motion is gated on MOUSE_MODE_CAPTURED above).
+	if event is InputEventMouseButton \
+			and event.pressed \
+			and event.button_index == MOUSE_BUTTON_LEFT \
+			and Input.mouse_mode == Input.MOUSE_MODE_VISIBLE \
+			and not DisplayServer.is_touchscreen_available():
+		_grab_mouse()
 	if event is InputEventKey and event.pressed:
 		match event.keycode:
 			KEY_1: switch_weapon(0)
