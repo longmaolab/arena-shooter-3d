@@ -8,7 +8,7 @@ const PLAYER_SCENE := preload("res://scenes/player.tscn")
 
 # Server-authoritative combat constants. Damage is NOT trusted from clients.
 const SERVER_MAX_HEALTH := 100
-const SERVER_RESPAWN_INVINCIBILITY := 1.5
+const SERVER_RESPAWN_INVINCIBILITY := 2.5
 # How long the player stays dead before being teleported to a new spawn.
 # Gives them a beat to read the kill banner / death screen.
 const SERVER_RESPAWN_DELAY := 2.5
@@ -359,12 +359,16 @@ func _random_spawn_pos() -> Vector3:
 	var pts := spawn_points.get_children()
 	if pts.is_empty():
 		return Vector3(0, 2, 0)
-	# Threats = every player still in the scene with HP > 0. Includes the
-	# victim's old death location, so the new spawn is far from where they
-	# just got killed.
+	# Threats = every player still alive per the server-authoritative dict.
+	# (Node-local `health` is stale on the server for remote clients.) The
+	# victim's old death location is also included because their dict entry
+	# stays at health=0 only briefly during _handle_kill's await — but its
+	# node position is what we want to spawn far from.
 	var threats: Array = []
 	for child in players_root.get_children():
-		if int(child.health) <= 0:
+		var pid: int = int(child.player_peer_id) if "player_peer_id" in child else 0
+		var info: Dictionary = NetworkManager.players.get(pid, {})
+		if int(info.get("health", 100)) <= 0:
 			continue
 		threats.append(child.global_position)
 	if threats.is_empty():

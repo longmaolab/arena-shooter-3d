@@ -61,6 +61,11 @@ var _current_anim: String = ""
 var _is_bot: bool = false
 var player_peer_id: int = 0
 
+# First-person weapon meshes parented under Camera3D. Built once on local
+# authority spawn; nil for remote-viewed players and bots so remote
+# observers don't see a floating gun glued to someone else's face.
+var _weapon_views: Array[Node3D] = []
+
 # Bot AI state — only meaningful when _is_bot is true and we're on the host.
 const BOT_VIEW_RANGE := 22.0
 const BOT_LOSE_RANGE := 30.0
@@ -121,6 +126,8 @@ func _setup_authority_visuals() -> void:
 			name_label.visible = false
 			camera.current = true
 			_grab_mouse()
+			_build_weapon_views()
+			_update_weapon_view_visibility()
 			# Push initial weapon state to whoever's listening (HUD).
 			var w: Dictionary = WEAPONS[current_weapon]
 			local_weapon_changed.emit(
@@ -260,10 +267,85 @@ func switch_weapon(idx: int) -> void:
 		return
 	is_reloading = false
 	current_weapon = idx
+	_update_weapon_view_visibility()
 	var w: Dictionary = WEAPONS[idx]
 	local_weapon_changed.emit(
 		idx, str(w["name"]), weapon_ammo[idx], int(w["max_ammo"]))
 	local_ammo_changed.emit(weapon_ammo[idx])
+
+# ─── First-person weapon view ────────────────────────────────────────
+# Three low-poly gun models parented under Camera3D. Built procedurally to
+# keep player.tscn clean. Only the active weapon's model is visible at any
+# given time; switch_weapon() swaps which one is shown.
+
+func _build_weapon_views() -> void:
+	if _weapon_views.size() > 0:
+		return  # already built
+	_weapon_views.resize(3)
+	_weapon_views[0] = _build_pistol_view()
+	_weapon_views[1] = _build_smg_view()
+	_weapon_views[2] = _build_shotgun_view()
+	for v in _weapon_views:
+		camera.add_child(v)
+		v.visible = false
+
+func _update_weapon_view_visibility() -> void:
+	for i in _weapon_views.size():
+		if _weapon_views[i]:
+			_weapon_views[i].visible = (i == current_weapon)
+
+func _gun_material(accent: Color, accent_strength: float = 1.6) -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.18, 0.18, 0.22)
+	mat.metallic = 0.65
+	mat.metallic_specular = 0.5
+	mat.roughness = 0.35
+	mat.emission_enabled = true
+	mat.emission = accent
+	mat.emission_energy_multiplier = accent_strength * 0.18
+	return mat
+
+func _gun_part(parent: Node3D, size: Vector3, pos: Vector3, mat: StandardMaterial3D) -> void:
+	var b := CSGBox3D.new()
+	b.size = size
+	b.position = pos
+	b.material_override = mat
+	parent.add_child(b)
+
+func _build_pistol_view() -> Node3D:
+	# Compact handgun. Sits a bit closer than the longer guns.
+	var root := Node3D.new()
+	root.name = "PistolView"
+	var mat := _gun_material(Color(1.0, 0.85, 0.30))
+	var off := Vector3(0.22, -0.16, -0.50)
+	_gun_part(root, Vector3(0.06, 0.16, 0.07), off + Vector3(0, -0.10, 0.05), mat)  # grip
+	_gun_part(root, Vector3(0.06, 0.07, 0.18), off, mat)                            # slide/body
+	_gun_part(root, Vector3(0.02, 0.02, 0.02), off + Vector3(0, 0.04, -0.08), mat)  # front sight
+	return root
+
+func _build_smg_view() -> Node3D:
+	# Medium-length submachine gun.
+	var root := Node3D.new()
+	root.name = "SmgView"
+	var mat := _gun_material(Color(0.45, 0.85, 1.0))
+	var off := Vector3(0.22, -0.16, -0.50)
+	_gun_part(root, Vector3(0.05, 0.16, 0.06), off + Vector3(0, -0.10, 0.07), mat)   # grip
+	_gun_part(root, Vector3(0.07, 0.08, 0.32), off, mat)                              # body
+	_gun_part(root, Vector3(0.05, 0.12, 0.04), off + Vector3(0, -0.10, -0.02), mat)   # magazine
+	_gun_part(root, Vector3(0.04, 0.04, 0.10), off + Vector3(0, 0.02, -0.20), mat)    # barrel
+	return root
+
+func _build_shotgun_view() -> Node3D:
+	# Bulky pump-action.
+	var root := Node3D.new()
+	root.name = "ShotgunView"
+	var mat := _gun_material(Color(1.0, 0.60, 0.30))
+	var off := Vector3(0.22, -0.16, -0.50)
+	_gun_part(root, Vector3(0.06, 0.18, 0.08), off + Vector3(0, -0.10, 0.10), mat)   # grip
+	_gun_part(root, Vector3(0.08, 0.10, 0.36), off, mat)                              # receiver
+	_gun_part(root, Vector3(0.07, 0.07, 0.12), off + Vector3(0, -0.06, 0.00), mat)    # forend / pump
+	_gun_part(root, Vector3(0.07, 0.05, 0.20), off + Vector3(0, 0.06, -0.20), mat)    # barrel
+	return root
 
 func pause_state_broadcast(seconds: float) -> void:
 	# Called by game.gd when a new peer joins, so we don't fire _remote_state
@@ -334,9 +416,15 @@ func _bot_tick(delta: float) -> void:
 		else:
 			_bot_wander(delta)
 	else:  # ENGAGE
+		# Drop target on: gone / dead / now-invincible (spawn-protected) /
+		# out of leash range. Server-authoritative state takes priority over
+		# the local node's stale health field.
+		var t_pid: int = int(_bot_target.player_peer_id) if is_instance_valid(_bot_target) and "player_peer_id" in _bot_target else 0
+		var t_info: Dictionary = NetworkManager.players.get(t_pid, {})
 		var lost := (
 			not is_instance_valid(_bot_target)
-			or int(_bot_target.health) <= 0
+			or int(t_info.get("health", 100)) <= 0
+			or bool(t_info.get("invincible", false))
 			or global_position.distance_to(_bot_target.global_position) > BOT_LOSE_RANGE)
 		if lost:
 			_bot_state = BotState.WANDER
@@ -352,10 +440,17 @@ func _bot_find_nearest_human() -> Node:
 	for c in get_tree().get_nodes_in_group("player"):
 		if c == self:
 			continue
-		# Skip other bots and dead players.
 		if c._is_bot:
 			continue
-		if int(c.health) <= 0:
+		# Use the server-authoritative dict, not node.health which goes
+		# stale on the server for remote clients. Skip dead or invincible
+		# (newly respawned) targets so the player gets a real spawn-protection
+		# window instead of bots converging the instant invincibility starts.
+		var pid: int = int(c.player_peer_id) if "player_peer_id" in c else 0
+		var info: Dictionary = NetworkManager.players.get(pid, {})
+		if int(info.get("health", 100)) <= 0:
+			continue
+		if bool(info.get("invincible", false)):
 			continue
 		var d: float = global_position.distance_to(c.global_position)
 		if d < nearest_dist:
@@ -523,30 +618,64 @@ func _flash_muzzle() -> void:
 			muzzle.visible = false)
 
 func _spawn_tracer(start: Vector3, end: Vector3, hit_player: bool) -> void:
+	# An actual flying bullet head + a fading streak behind it. Damage was
+	# already resolved at fire time by raycast; this is purely cinematic.
+	#
+	# Flight time scales with distance so close shots feel snappy and long
+	# shots have a sniper-rifle "see it travel" moment, but never so slow
+	# that gameplay timing feels off.
 	var dist := start.distance_to(end)
 	if dist < 0.5:
 		return
-	var tracer := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = Vector3(0.05, 0.05, dist)
-	tracer.mesh = bm
-	tracer.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	var mat := StandardMaterial3D.new()
 	var color := Color(1, 0.4, 0.4) if hit_player else Color(1, 0.95, 0.5)
-	mat.albedo_color = color
-	mat.emission_enabled = true
-	mat.emission = color
-	mat.emission_energy_multiplier = 5.0
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	tracer.material_override = mat
-	get_tree().current_scene.add_child(tracer)
-	tracer.global_position = (start + end) * 0.5
-	tracer.look_at(end, Vector3.UP, true)
-	var tw := tracer.create_tween()
-	tw.tween_property(mat, "albedo_color:a", 0.0, 0.12)
-	tw.parallel().tween_property(mat, "emission_energy_multiplier", 0.0, 0.12)
-	tw.tween_callback(tracer.queue_free)
+	# Cap at ~250 ms even at max range (80 m).
+	var flight_time: float = clamp(0.05 + dist * 0.0025, 0.05, 0.25)
+
+	# Bullet head: glowing sphere that flies from muzzle to impact.
+	var head := MeshInstance3D.new()
+	var head_mesh := SphereMesh.new()
+	head_mesh.radius = 0.08
+	head_mesh.height = 0.16
+	head_mesh.radial_segments = 8
+	head_mesh.rings = 4
+	head.mesh = head_mesh
+	head.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var head_mat := StandardMaterial3D.new()
+	head_mat.albedo_color = color
+	head_mat.emission_enabled = true
+	head_mat.emission = color
+	head_mat.emission_energy_multiplier = 6.5
+	head_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	head.material_override = head_mat
+	get_tree().current_scene.add_child(head)
+	head.global_position = start
+	var ht := head.create_tween()
+	ht.tween_property(head, "global_position", end, flight_time)
+	ht.tween_callback(head.queue_free)
+
+	# Streak: thin box rendered as a momentary trail from start to end. Fades
+	# faster than the head's flight so the trail is visible only briefly
+	# behind the bullet, not all-at-once like the v6.x static tracer.
+	var trail := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.04, 0.04, dist)
+	trail.mesh = bm
+	trail.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var trail_mat := StandardMaterial3D.new()
+	trail_mat.albedo_color = Color(color.r, color.g, color.b, 0.55)
+	trail_mat.emission_enabled = true
+	trail_mat.emission = color
+	trail_mat.emission_energy_multiplier = 3.0
+	trail_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	trail_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	trail.material_override = trail_mat
+	get_tree().current_scene.add_child(trail)
+	trail.global_position = (start + end) * 0.5
+	trail.look_at(end, Vector3.UP, true)
+	var tt := trail.create_tween()
+	tt.tween_property(trail_mat, "albedo_color:a", 0.0, flight_time * 0.8)
+	tt.parallel().tween_property(trail_mat, "emission_energy_multiplier", 0.0, flight_time * 0.8)
+	tt.tween_callback(trail.queue_free)
 
 func _spawn_impact(pos: Vector3, normal: Vector3) -> void:
 	var impact := MeshInstance3D.new()

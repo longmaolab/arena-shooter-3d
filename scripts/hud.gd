@@ -36,6 +36,8 @@ var _show_countdown_text: bool = false
 var _kill_banner_timer: float = 0.0
 var _hit_marker_tween: Tween = null
 var _current_weapon_name: String = "AMMO"
+var _click_resume_overlay: PanelContainer = null
+var _click_resume_label: Label = null
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -44,6 +46,7 @@ func _ready() -> void:
 	death_overlay.modulate.a = 0.0
 	kill_banner_panel.visible = false
 	lb_panel.visible = false
+	_build_click_resume_overlay()
 
 func _process(delta: float) -> void:
 	if _vignette_alpha > 0.0:
@@ -56,6 +59,64 @@ func _process(delta: float) -> void:
 		_kill_banner_timer = max(0.0, _kill_banner_timer - delta)
 		if _kill_banner_timer == 0.0:
 			kill_banner_panel.visible = false
+	_update_click_resume_overlay()
+
+# ─── Click-to-resume overlay ────────────────────────────────────────
+# Shown when the local player is in-game but mouse is uncaptured (e.g. after
+# ESC, alt-tab, or a browser pointer-lock hiccup). Re-capture itself is
+# handled in player.gd::_unhandled_input on left click — this overlay just
+# makes the recovery visible to the kid.
+
+func _build_click_resume_overlay() -> void:
+	var panel := PanelContainer.new()
+	panel.anchor_left = 0.5
+	panel.anchor_top = 0.5
+	panel.anchor_right = 0.5
+	panel.anchor_bottom = 0.5
+	panel.offset_left = -180
+	panel.offset_top = -36
+	panel.offset_right = 180
+	panel.offset_bottom = 36
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.06, 0.05, 0.16, 0.92)
+	sb.border_color = Color(0.50, 0.85, 1.0, 0.85)
+	sb.border_width_left = 2
+	sb.border_width_top = 2
+	sb.border_width_right = 2
+	sb.border_width_bottom = 2
+	sb.corner_radius_top_left = 22
+	sb.corner_radius_top_right = 22
+	sb.corner_radius_bottom_right = 22
+	sb.corner_radius_bottom_left = 22
+	sb.content_margin_left = 26
+	sb.content_margin_right = 26
+	sb.content_margin_top = 14
+	sb.content_margin_bottom = 14
+	sb.shadow_color = Color(0, 0, 0, 0.6)
+	sb.shadow_size = 12
+	panel.add_theme_stylebox_override("panel", sb)
+	var lbl := Label.new()
+	lbl.text = "▶  CLICK TO RESUME"
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.add_theme_font_size_override("font_size", 24)
+	lbl.add_theme_color_override("font_color", Color(1, 1, 1))
+	lbl.add_theme_color_override("font_outline_color", Color.BLACK)
+	lbl.add_theme_constant_override("outline_size", 4)
+	panel.add_child(lbl)
+	panel.visible = false
+	add_child(panel)
+	_click_resume_overlay = panel
+	_click_resume_label = lbl
+
+func _update_click_resume_overlay() -> void:
+	if _click_resume_overlay == null:
+		return
+	# Only meaningful in-game on desktop where the pointer can be captured.
+	var in_game := local_player != null and is_instance_valid(local_player)
+	var on_touch := DisplayServer.is_touchscreen_available()
+	var visible_mouse := Input.mouse_mode == Input.MOUSE_MODE_VISIBLE
+	_click_resume_overlay.visible = in_game and not on_touch and visible_mouse
 
 func bind_to_game(g: Node) -> void:
 	if not NetworkManager.player_list_changed.is_connected(_refresh_scoreboard):
