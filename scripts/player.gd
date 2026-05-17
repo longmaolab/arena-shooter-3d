@@ -66,6 +66,11 @@ var player_peer_id: int = 0
 # observers don't see a floating gun glued to someone else's face.
 var _weapon_views: Array[Node3D] = []
 
+# Seconds remaining where the shoot action is ignored after a click that
+# re-captured the mouse. Keeps the "click to resume" gesture from
+# accidentally firing a shot.
+var _recapture_shot_suppress: float = 0.0
+
 # Bot AI state — only meaningful when _is_bot is true and we're on the host.
 const BOT_VIEW_RANGE := 22.0
 const BOT_LOSE_RANGE := 30.0
@@ -242,12 +247,17 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Left-click anywhere in the game window re-captures the mouse after the
 	# kid pressed ESC. Without this branch they could move + shoot but
 	# couldn't turn (mouse motion is gated on MOUSE_MODE_CAPTURED above).
+	# Suppress the shoot action for ~0.1 s so the click used to refocus
+	# the canvas doesn't also fire a bullet. Touchscreen guard is here AND
+	# inside _grab_mouse() — belt and suspenders so a tap never silently
+	# locks the cursor on a phone.
 	if event is InputEventMouseButton \
 			and event.pressed \
 			and event.button_index == MOUSE_BUTTON_LEFT \
 			and Input.mouse_mode == Input.MOUSE_MODE_VISIBLE \
 			and not DisplayServer.is_touchscreen_available():
 		_grab_mouse()
+		_recapture_shot_suppress = 0.1
 	if event is InputEventKey and event.pressed:
 		match event.keycode:
 			KEY_1: switch_weapon(0)
@@ -377,7 +387,7 @@ func _physics_process(delta: float) -> void:
 		if is_inside_tree() and not is_queued_for_deletion():
 			_remote_state.rpc(global_position, rotation.y, camera.rotation.x, _current_anim)
 
-func _human_tick(_delta: float) -> void:
+func _human_tick(delta: float) -> void:
 	if Input.is_action_just_pressed("jump") and is_on_floor():
 		velocity.y = JUMP_VELOCITY
 	var input_dir := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
@@ -389,7 +399,12 @@ func _human_tick(_delta: float) -> void:
 	else:
 		velocity.x = move_toward(velocity.x, 0.0, speed)
 		velocity.z = move_toward(velocity.z, 0.0, speed)
-	if Input.is_action_pressed("shoot"):
+	# Tick down the recapture-grace timer. While it's > 0 the shoot action
+	# is ignored, so the click that just refocused the canvas doesn't also
+	# fire a bullet.
+	if _recapture_shot_suppress > 0.0:
+		_recapture_shot_suppress = maxf(0.0, _recapture_shot_suppress - delta)
+	elif Input.is_action_pressed("shoot"):
 		_try_shoot()
 	if Input.is_action_just_pressed("reload"):
 		_reload()
