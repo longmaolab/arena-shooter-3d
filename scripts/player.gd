@@ -23,7 +23,7 @@ const WEAPONS := [
 	{"name": "SHOTGUN", "fire_rate": 0.80, "max_ammo": 8,  "spread": 0.18, "pellets": 5, "reload_time": 2.2},
 ]
 const SYNC_INTERVAL    := 0.05
-const RESPAWN_INVINCIBILITY := 1.5
+const RESPAWN_INVINCIBILITY := 2.5  # matches game.gd::SERVER_RESPAWN_INVINCIBILITY
 
 const SKIN_COUNT := 18
 const SKIN_PATH_PREFIX := "res://models/characters/character-"
@@ -818,9 +818,15 @@ func respawn_at(pos: Vector3) -> void:
 
 @rpc("authority", "reliable", "call_local")
 func _show_respawn() -> void:
-	if not is_multiplayer_authority():
-		model_holder.visible = true
-		name_label.visible = true
+	# Only the LOCAL HUMAN player keeps their own model hidden (first-person
+	# view). Bots are server-controlled but rendered third-person to every
+	# viewer — including the host that owns them — so the previous
+	# `if not is_multiplayer_authority()` guard accidentally kept the bot's
+	# model hidden on the host's screen after respawn.
+	if is_multiplayer_authority() and not _is_bot:
+		return
+	model_holder.visible = true
+	name_label.visible = true
 
 func _run_invincibility() -> void:
 	is_invincible = true
@@ -836,6 +842,9 @@ func _run_invincibility() -> void:
 
 @rpc("authority", "unreliable", "call_local")
 func _blink_visibility(visible_on: bool) -> void:
-	if is_multiplayer_authority():
+	# Same first-person-keep-hidden rule as _show_respawn. Bots on the host
+	# still need their model toggled or they stay invisible the whole
+	# invincibility window.
+	if is_multiplayer_authority() and not _is_bot:
 		return
 	model_holder.visible = visible_on
