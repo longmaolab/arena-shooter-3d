@@ -24,15 +24,23 @@ Day-to-day commands. For the full architecture, see [SERVER_GUIDE.md](SERVER_GUI
 ### Web client changed (scripts / scenes / project.godot)
 
 ```bash
-# 1) In Godot: Project → Export → Web → Export Project (overwrites docs/)
-# 2) One-shot deploy:
 cd /Users/longmao/projects/arena-shooter-3d
 ./deploy.sh
 ```
 
-`deploy.sh` runs: `git push` → `ssh server → git pull` → **`godot --headless --import`** (rebuilds the `.godot/imported/` cache so any new fonts/textures/models can be loaded) → `systemctl restart arena-game`. **Players see the new version after a hard refresh, ~5 seconds later.**
+`deploy.sh` does **everything**:
 
-> ⚠️ Without the `--import` step, any newly added asset (font, texture, model) will fail to load on the server with `Cannot open file 'res://.godot/imported/...'`. `deploy.sh` does this automatically.
+1. **Auto-detects** if any GDScript / scene / asset / project setting changed since the last build
+2. **Auto-exports** the web build via `godot --headless --export-release "Web"` (~30-60s when needed; skipped when not)
+3. Cleans up `.import` editor leftovers
+4. `git commit + push`
+5. `ssh server → git pull → godot --headless --import → sudo systemctl restart arena-game`
+
+**Players see the new version after a hard refresh, ~5 seconds (no source changes) or ~60 seconds (with re-export).**
+
+> ⚠️ `git push` alone is not enough — that only pushes source to GitHub but doesn't update the VPS or rebuild the web client. Always use `./deploy.sh`.
+
+> ⚠️ Without the server-side `--import` step, any newly added asset (font, texture, model) will fail to load on the server with `Cannot open file 'res://.godot/imported/...'`. `deploy.sh` handles this automatically.
 
 ### Server-side only (GDScript that doesn't change the web client)
 
@@ -195,15 +203,23 @@ All code is in git. **If the server is destroyed**:
 ### Web 客户端改了（scripts / scenes / project.godot）
 
 ```bash
-# 1) 在 Godot 里：项目 → 导出 → Web → 导出项目（覆盖 docs/）
-# 2) 一键发布：
 cd /Users/longmao/projects/arena-shooter-3d
 ./deploy.sh
 ```
 
-`deploy.sh` 会：`git push` → `ssh 服务器 git pull` → **`godot --headless --import`**（刷新 `.godot/imported/` 缓存，新加的字体/贴图/模型才能被加载）→ `systemctl restart arena-game`，**5 秒后玩家硬刷新即可**。
+`deploy.sh` 自己搞定全部事:
 
-> ⚠️ 不跑 `--import` 这一步的话，新加的资源（比如新字体/新模型）在服务器上启动时会报 `Cannot open file 'res://.godot/imported/...'`。`deploy.sh` 已自动处理。
+1. **检测**有没有 GDScript / 场景 / 资源 / 项目设置改过
+2. **自动 export**(`godot --headless --export-release "Web"`,约 30-60 秒;没改源文件就跳过,5 秒)
+3. 清理 `.import` 编辑器残留
+4. `git commit + push`
+5. `ssh server → git pull → godot --headless --import → sudo systemctl restart arena-game`
+
+**玩家硬刷新就能看到新版本**(无源码改动约 5 秒;带 re-export 约 60 秒)。
+
+> ⚠️ 单独 `git push` 不够 —— 只推源码到 GitHub,不会更新 VPS,不会重新打包网页版。永远用 `./deploy.sh`。
+
+> ⚠️ 不跑服务器端 `--import` 的话,新加的资源(字体/贴图/模型)启动时会报 `Cannot open file 'res://.godot/imported/...'`。`deploy.sh` 已自动处理。
 
 ### 只改了服务器端（GDScript 但不影响 Web 客户端）
 

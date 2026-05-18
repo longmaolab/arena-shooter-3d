@@ -134,18 +134,19 @@ time unless you mean to split traffic.
 
 ## Re-deploying
 
-After each code change:
+After each code change, one command:
 
 ```bash
-# 1) In Godot: Project → Export → Web → Export Project (overwrites docs/)
-# 2) One-shot deploy
 ./deploy.sh
 ```
 
-`deploy.sh` runs: `git commit + push` → ssh the server → `git pull` →
-`godot --headless --import` (rebuilds the imported-asset cache so any
-new fonts/textures/models load) → `systemctl restart arena-game`.
-**Players see the new version after a hard refresh** (~5 seconds).
+The script handles everything:
+- Detects if any `scripts/` / `scenes/` / `audio/` / `fonts/` / `models/` / `themes/` / `project.godot` is newer than `docs/index.pck`
+- If yes → re-exports the web build headlessly (~30-60s)
+- If no → skips export (~5s)
+- Cleans up `.import` leftovers, commits, pushes, ssh's server, pulls, re-imports, restarts the game server
+
+**Players see the new version after a hard refresh** (~5s without re-export, ~60s with).
 
 ---
 
@@ -322,16 +323,19 @@ Mac 上 cloudflared 会和 VPS 上 cloudflared 注册到同一个隧道,Cloudfla
 
 ## 重新发布
 
-每次改了代码：
+改完代码,一行命令:
 
 ```bash
-# 1) Godot 里：项目 → 导出 → Web → 导出项目（覆盖 docs/）
-# 2) 一行发布
 ./deploy.sh
 ```
 
-`deploy.sh` 会：`git commit + push` → ssh 到服务器 `git pull` → `godot --headless --import`（刷新资源缓存，新加的字体/贴图/模型才能用）→ `systemctl restart arena-game`。
-**5 秒后玩家硬刷新即可看到新版本**。
+脚本会全自动:
+- 检测 `scripts/` / `scenes/` / `audio/` / `fonts/` / `models/` / `themes/` / `project.godot` 里是否有比 `docs/index.pck` 新的文件
+- 是 → headless 调 Godot 重新 export 网页版(~30-60 秒)
+- 否 → 跳过 export(~5 秒)
+- 然后:清理 `.import` 残留、commit、push、ssh 服务器、git pull、重建 import 缓存、重启 arena-game
+
+**玩家硬刷新就能看到新版本**(不需要 export 时约 5 秒;需要 export 时约 60 秒)。
 
 ---
 

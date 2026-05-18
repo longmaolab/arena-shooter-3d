@@ -152,44 +152,44 @@ The main menu's 1 / 2 / 3 buttons set the count. To make the default 3 instead o
 
 ## 🌐 Part 4: Pushing changes so friends see them
 
-After editing code, **the web version won't auto-update**. Three steps:
-
-### Step ① Export from Godot
-
-1. Top menu **Project → Export**
-2. Pick **Web (Runnable)** → click **Export Project**
-3. Leave the path as default (`docs/index.html`) → save
-4. Wait a few seconds for the export to finish
-
-### Step ② Clean up Godot editor leftovers
-
-In a terminal:
+After editing code, run **one command**:
 
 ```bash
 cd /Users/longmao/projects/arena-shooter-3d
-find docs -name "*.import" -delete
-```
-
-### Step ③ Push to the VPS
-
-```bash
 ./deploy.sh
 ```
 
-That's it. `deploy.sh` does **commit + push to GitHub + ssh into the VPS + git pull + re-import + restart the game server** in one go.
+That's it. `deploy.sh` figures out everything:
 
-> ⚠️ A plain `git push` alone is **not enough** anymore — that only pushes to GitHub but doesn't update the VPS. (We're no longer on GitHub Pages, so GitHub itself doesn't serve the game.) Always use `./deploy.sh`.
+1. Detects whether you changed any GDScript / scene / asset / project setting
+2. If yes → calls Godot in headless mode to **re-export the web build** automatically (~30-60 s)
+3. If no → skips the export step (~5 s)
+4. Cleans up `.import` editor leftovers
+5. Commits + pushes to GitHub
+6. SSH's the VPS, `git pull`, `godot --headless --import`, `systemctl restart arena-game`
 
-If `deploy.sh` ever errors out, here are the same steps run by hand:
+> ⚠️ A plain `git push` alone is **not enough** — that only pushes source to GitHub but doesn't update the VPS or rebuild the web client. **Always use `./deploy.sh`**.
+
+After `deploy.sh` finishes, tell your friend to hit ⌘+Shift+R (Mac) or Ctrl+Shift+R (Windows) — the browser still caches the old `.pck` and `.wasm`, so a hard refresh is needed to pull the new build.
+
+### When does deploy.sh skip the export step?
+
+It compares timestamps. `docs/index.pck` is the build artifact. If any of `scripts/`, `scenes/`, `audio/`, `fonts/`, `models/`, `themes/`, `project.godot` is newer than `docs/index.pck`, it re-exports. Otherwise it skips. So:
+
+- Changed `scripts/player.gd` → re-export (full 60s)
+- Only changed `README.md` → skip (5s)
+- Only changed `run_server.sh` → skip (5s, server-only file)
+
+### Manual fallback (if deploy.sh ever errors)
 
 ```bash
+# Step 1: export manually from Godot GUI (Project → Export → Web → Export Project)
+# Step 2:
 git add -A
 git commit -m "Update game: write what you changed here"
 git push
 ssh root@207.148.98.206 'cd /opt/games/arena-shooter-3d && git pull && godot --headless --path . --import && systemctl restart arena-game'
 ```
-
-After `deploy.sh` finishes (~5 seconds), tell your friend to hit ⌘+Shift+R (Mac) or Ctrl+Shift+R (Windows) — the browser still caches the old `.pck` and `.wasm`, so a hard refresh is needed to pull the new build.
 
 ---
 
@@ -688,44 +688,44 @@ ssh root@207.148.98.206 'journalctl -u arena-game -n 30 --no-pager'
 
 ## 🌐 第 4 部分：改完了让朋友看到新版本
 
-代码改了之后，**网页版不会自动更新**。要做这三步：
-
-### 步骤 ① 在 Godot 里导出
-
-1. 顶部菜单 **项目 → 导出**
-2. 选 **Web (Runnable)** → 点 **导出项目**
-3. 路径不用改（默认就是 `docs/index.html`）→ 保存
-4. 等几秒钟导出完成
-
-### 步骤 ② 清理 Godot 编辑器残留文件
-
-在终端里：
+代码改了之后,**就一行命令**:
 
 ```bash
 cd /Users/longmao/projects/arena-shooter-3d
-find docs -name "*.import" -delete
-```
-
-### 步骤 ③ 推送
-
-```bash
 ./deploy.sh
 ```
 
-就这一条命令搞定。`deploy.sh` 内部会:**commit + push 到 GitHub + ssh 上 VPS + git pull + 重新 import + 重启游戏服务器**,5 秒搞完。
+完事。`deploy.sh` 自己搞定所有事:
 
-> ⚠️ 现在 **`git push` 单独跑是没用的** —— 它只推到 GitHub,不会更新 VPS。我们已经**不用 GitHub Pages 了**,GitHub 本身不发布游戏,真正在线的是 VPS。所以**永远用 `./deploy.sh`**。
+1. 检测你改了哪些文件(GDScript / 场景 / 资源 / 项目设置)
+2. 改了就**自动调 Godot 在 headless 模式重新 export 网页版**(~30-60 秒)
+3. 没改就跳过 export 步骤(~5 秒)
+4. 清掉 `.import` 编辑器残留
+5. commit + push 到 GitHub
+6. SSH 上 VPS、`git pull`、`godot --headless --import`、`systemctl restart arena-game`
 
-万一 `deploy.sh` 报错跑不通,下面是它内部等价的手动版本:
+> ⚠️ 单独 **`git push` 是没用的** —— 它只推源码到 GitHub,不会更新 VPS,也不会重新打包网页版。**永远用 `./deploy.sh`**。
+
+`deploy.sh` 跑完之后,让朋友按 ⌘+Shift+R(Mac)或 Ctrl+Shift+R(Win)**硬刷新** —— 浏览器还缓存着老的 `.pck` 和 `.wasm`,不硬刷新看到的还是旧版。
+
+### deploy.sh 什么时候跳过 export?
+
+按时间戳判断。`docs/index.pck` 是构建产物。`scripts/`、`scenes/`、`audio/`、`fonts/`、`models/`、`themes/`、`project.godot` 里**任何一个文件**比 `docs/index.pck` 新,就触发重新 export;否则跳过。所以:
+
+- 改了 `scripts/player.gd` → 自动重新 export(60 秒)
+- 只改了 `README.md` → 跳过(5 秒)
+- 只改了 `run_server.sh` → 跳过(5 秒,纯服务器文件)
+
+### 万一 deploy.sh 报错,手动 fallback
 
 ```bash
+# 步骤 1: 在 Godot GUI 里手动导出(项目 → 导出 → Web → 导出项目)
+# 步骤 2:
 git add -A
 git commit -m "更新游戏:你做了什么改动写在这里"
 git push
 ssh root@207.148.98.206 'cd /opt/games/arena-shooter-3d && git pull && godot --headless --path . --import && systemctl restart arena-game'
 ```
-
-`deploy.sh` 跑完(~5 秒)之后,让朋友按 ⌘+Shift+R(Mac)或 Ctrl+Shift+R(Win)**硬刷新** —— 浏览器还缓存着老的 `.pck` 和 `.wasm`,不硬刷新看到的还是旧版。
 
 ---
 
