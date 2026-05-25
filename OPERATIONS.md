@@ -71,7 +71,7 @@ SSH in first: `ssh root@207.148.98.206`
 | Live web-server log | `journalctl -u caddy -f` |
 | Restart game server | `systemctl restart arena-game` |
 | Restart tunnel | `systemctl restart cloudflared` |
-| Restart Caddy | `systemctl reload caddy` (config change); `systemctl restart caddy` (full restart) |
+| Restart Caddy | `systemctl restart caddy` (config change or full restart — `reload` fails because Caddyfile sets `admin off`, so the admin-API path can't work) |
 | Listening ports | `ss -ltnp \| grep -E ':80\|:7777'` |
 | Memory | `free -h` |
 | Disk | `df -h /` |
@@ -141,7 +141,7 @@ curl -s https://game.boobank.com/arena-shooter/server.json
 ### Caddyfile edited but no effect
 ```bash
 caddy validate --config /etc/caddy/Caddyfile      # validate first
-systemctl reload caddy                             # reload without restart
+systemctl restart caddy                            # restart (reload fails — admin off)
 journalctl -u caddy -n 20 --no-pager               # check for errors
 ```
 
@@ -250,7 +250,7 @@ ssh root@207.148.98.206 'cd /opt/games/portal && git pull'
 | 实时看 Web 服务器日志 | `journalctl -u caddy -f` |
 | 重启游戏服务器 | `systemctl restart arena-game` |
 | 重启隧道 | `systemctl restart cloudflared` |
-| 重启 Caddy | `systemctl reload caddy`（配置变更）；`systemctl restart caddy`（重启） |
+| 重启 Caddy | `systemctl restart caddy`（配置变更 / 完全重启都用这个 —— Caddyfile 写了 `admin off`,`reload` 走的 admin API 路径连不上,永远失败） |
 | 看监听端口 | `ss -ltnp \| grep -E ':80\|:7777'` |
 | 看内存 | `free -h` |
 | 看磁盘 | `df -h /` |
@@ -320,7 +320,7 @@ curl -s https://game.boobank.com/arena-shooter/server.json
 ### 改了 Caddyfile 但没生效
 ```bash
 caddy validate --config /etc/caddy/Caddyfile      # 先验证
-systemctl reload caddy                             # 不重启的方式重载
+systemctl restart caddy                            # 用 restart(reload 因 admin off 会失败)
 journalctl -u caddy -n 20 --no-pager               # 看有没有报错
 ```
 
